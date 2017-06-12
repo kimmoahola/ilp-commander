@@ -12,4 +12,4 @@ pip install -q -r requirements.txt 2> /dev/null
 
 sudo service lirc stop && sudo service lirc start
 sudo supervisorctl add ilp-commander > /dev/null
-sudo supervisorctl restart ilp-commander
+sudo supervisorctl restart ilp-commander > /dev/null
