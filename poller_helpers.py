@@ -13,10 +13,10 @@ from pony import orm
 import config
 
 logger = logging.getLogger('poller')
-hdlr = logging.FileHandler('poller.log')
+handler = logging.FileHandler('poller.log')
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(funcName)s: %(message)s')
-hdlr.setFormatter(formatter)
-logger.addHandler(hdlr)
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 logger.info('----- START -----')
 
@@ -45,7 +45,7 @@ class CommandLog(db.Entity):
     command = orm.Required(str)
     param = orm.Optional(str, default='')
 
-    # User str here because pony uses str() to convert datetime before insert.
+    # Use str here because pony uses str() to convert datetime before insert.
     # That puts datetime in wrong format to DB.
     ts = orm.Required(str, default=lambda: arrow.utcnow().isoformat())
 
@@ -59,8 +59,6 @@ with db.set_perms_for(CommandLog):
 
 db.bind('sqlite', 'db.sqlite', create_db=True)
 db.generate_mapping(create_tables=True)
-# db.generate_mapping(check_tables=True)
-# orm.sql_debug(True)
 
 
 boto_session = boto3.Session(
@@ -107,21 +105,6 @@ def timing(f):
     return timing_wrap
 
 
-# class Timer(object):
-#     def __init__(self, name):
-#         self.name = name
-#
-#     def __enter__(self):
-#         self.start = time.time()
-#         return self
-#
-#     def __exit__(self, *args):
-#         self.end = time.time()
-#         self.interval = self.end - self.start
-#         logger.debug('"%s" took: %2.4f sec' % (self.name, self.interval))
-
-
-# @retry(tries=6, delay=30)
 def get_most_recent_message(once=False):
 
     logger.info('Start polling messages')
@@ -149,8 +132,6 @@ def get_most_recent_message(once=False):
             else:
                 most_recent_message = message
 
-            # print message.attributes['SentTimestamp']
-            # print("Message received: {0}".format(message.body))
             message.delete()
 
         if not messages:
@@ -160,10 +141,6 @@ def get_most_recent_message(once=False):
 
         if once:
             break
-
-        # if messages:
-        #     queue.delete_messages(
-        #         Entries=[{'Id': str(index), 'ReceiptHandle': '0'} for index, message in enumerate(messages)])
 
     if most_recent_message:
         message_dict = json.loads(most_recent_message.body)
