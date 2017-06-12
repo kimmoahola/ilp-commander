@@ -1,4 +1,5 @@
 *.log
 *.sqlite
-config.py
+/config.py
 *.pyc
+/.idea
