@@ -1,12 +1,10 @@
 # coding=utf-8
 import json
 import logging
-from datetime import timedelta
 from subprocess import Popen, PIPE
 
 import arrow
 import boto3
-import requests_cache
 from botocore.exceptions import BotoCoreError
 from pony import orm
 
@@ -33,9 +31,6 @@ class Commands(object):
     heat26 = 'heat_26__fan_auto__swing_auto'
     heat28 = 'heat_28__fan_auto__swing_auto'
     heat30 = 'heat_30__fan_auto__swing_auto'
-
-
-requests_cache.install_cache(backend='memory', expire_after=timedelta(minutes=10))
 
 
 db = orm.Database()
