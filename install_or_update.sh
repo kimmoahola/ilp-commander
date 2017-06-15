@@ -3,9 +3,9 @@
 chmod a+x *.sh
 
 chmod u+rw-x,go+r-wx crontab
-chown root:root crontab
+chown root:root crontab logrotate.conf
 
-sudo ln -sf /home/pi/ilp-commander/logrotate.conf /etc/logrotate.d/ilp-commander.conf
+sudo ln -sf /home/pi/ilp-commander/logrotate.conf /etc/logrotate.d/ilp-commander
 sudo ln -sf /home/pi/ilp-commander/supervisor.conf /etc/supervisor/conf.d/ilp-commander.conf
 sudo cp /home/pi/ilp-commander/lircd.conf /etc/lirc/lircd.conf
 pip install -q -r requirements.txt 2> /dev/null
