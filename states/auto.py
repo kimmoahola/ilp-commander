@@ -1,12 +1,14 @@
 # coding=utf-8
 import time
 from datetime import timedelta
+from statistics import median
 from urllib.parse import urlencode
 
 import arrow
 import requests
 import requests_cache
 import xmltodict
+from decimal import Decimal
 
 import config
 from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message
@@ -32,12 +34,13 @@ class Auto(State):
         temp2 = self.receive_yahoo_temperature()
         if temp2 is not None:
             temperatures.append(temp2)
+
         temp3 = self.receive_yr_no_temperature()
         if temp3 is not None:
             temperatures.append(temp3)
 
         if temperatures:
-            temp = Auto.take_mean(temperatures)
+            temp = median(temperatures)
             logger.info('The mean temperature %f', temp)
 
             if temp > 0:
@@ -69,11 +72,6 @@ class Auto(State):
         return get_most_recent_message(once=True)
 
     @staticmethod
-    def take_mean(values):
-        sorted_values = sorted(values)
-        return sorted_values[len(sorted_values)//2]  # Take the middle value
-
-    @staticmethod
     @timing
     def receive_yahoo_temperature():
         yql_query = "select item.condition from weather.forecast where woeid in (select woeid from geo.places(1) " \
@@ -84,7 +82,7 @@ class Auto(State):
         if result.status_code != 200:
             logger.error('%d: %s' % (result.status_code, result.content))
         else:
-            temp = float(result.json()['query']['results']['channel']['item']['condition']['temp'])
+            temp = Decimal(result.json()['query']['results']['channel']['item']['condition']['temp'])
             logger.info(temp)
             return temp
 
@@ -106,7 +104,7 @@ class Auto(State):
             MAX_AGE_MINUTES = 60
             is_recent_enough = (arrow.now() - arrow.get(temp_data['BsWfs:Time'])).total_seconds() < 60 * MAX_AGE_MINUTES
             if is_recent_enough:
-                temp = float(temp_data['BsWfs:ParameterValue'])
+                temp = Decimal(temp_data['BsWfs:ParameterValue'])
                 logger.info(temp)
                 return temp
 
@@ -129,7 +127,7 @@ class Auto(State):
             MAX_AGE_MINUTES = 60
             is_recent_enough = abs((arrow.now() - temp_date_time).total_seconds()) < 60 * MAX_AGE_MINUTES
             if is_recent_enough:
-                temp = float(d['weatherdata']['forecast']['tabular']['time'][0]['temperature']['@value'])
+                temp = Decimal(d['weatherdata']['forecast']['tabular']['time'][0]['temperature']['@value'])
                 logger.info(temp)
                 return temp
 
