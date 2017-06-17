@@ -1,7 +1,7 @@
 # coding=utf-8
 import time
-import urllib
 from datetime import timedelta
+from urllib.parse import urlencode
 
 import arrow
 import requests
@@ -78,7 +78,7 @@ class Auto(State):
     def receive_yahoo_temperature():
         yql_query = "select item.condition from weather.forecast where woeid in (select woeid from geo.places(1) " \
                     "where text='{location}') and u='c'".format(location=config.YAHOO_LOCATION)
-        yql_query_encoded = urllib.urlencode({'q': yql_query})
+        yql_query_encoded = urlencode({'q': yql_query})
         result = requests.get('https://query.yahooapis.com/v1/public/yql?' + yql_query_encoded + '&format=json')
 
         if result.status_code != 200:
