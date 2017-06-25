@@ -14,8 +14,6 @@ class Manual(State):
         if command:
             send_ir_signal(command)
 
-        # TODO: lähetä maili, että mitä tehtiin?
-
     def nex(self, payload):
         from states.wait_message_manual import WaitMessageManual
 

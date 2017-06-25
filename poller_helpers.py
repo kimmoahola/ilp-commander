@@ -1,12 +1,16 @@
 # coding=utf-8
 import json
 import logging
+import smtplib
+import time
+from email.mime.text import MIMEText
+from functools import wraps
 from subprocess import Popen, PIPE
 
 import arrow
-import boto3
-from botocore.exceptions import BotoCoreError
+import pygsheets
 from pony import orm
+from retry import retry
 
 import config
 
@@ -19,7 +23,7 @@ logger.setLevel(logging.DEBUG)
 logger.info('----- START -----')
 
 
-class Commands(object):
+class Commands:
     off = 'off'
     heat8 = 'heat_8__swing_auto'
     heat10 = 'heat_10__swing_auto'
@@ -56,14 +60,26 @@ db.bind('sqlite', 'db.sqlite', create_db=True)
 db.generate_mapping(create_tables=True)
 
 
-boto_session = boto3.Session(
-    aws_access_key_id=config.AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=config.AWS_SECRET_ACCESS_KEY,
-)
+@retry(tries=6, delay=3)
+def send_email(address, mime_text):
+    s = smtplib.SMTP('localhost')
+    s.sendmail(address, [address], mime_text.as_string())
+    s.quit()
 
-sqs = boto_session.resource('sqs', region_name=config.AWS_REGION_NAME)
 
-queue = sqs.get_queue_by_name(QueueName=config.AWS_SQS_QUEUE_NAME)
+def email(addresses, subject, message):
+
+    for address in addresses:
+
+        mime_text = MIMEText(message.encode('utf-8'), 'plain', 'utf-8')
+        mime_text['Subject'] = subject
+        mime_text['From'] = address
+        mime_text['To'] = address
+
+        try:
+            send_email(address, mime_text)
+        except Exception as e:
+            logger.exception(e)
 
 
 def send_ir_signal(command):
@@ -74,6 +90,11 @@ def send_ir_signal(command):
     time.sleep(5)
     actually_send_ir_signal(command)
 
+    email(
+        config.EMAIL_ADDRESSES,
+        'Send IR %s' % command,
+        'Send IR %s at %s' % (command, arrow.now().format('DD.MM.YYYY HH:mm')))
+
 
 def actually_send_ir_signal(command):
     try:
@@ -83,10 +104,6 @@ def actually_send_ir_signal(command):
             logger.error('%d: %s - %s', p.returncode, output, err)
     except Exception as e:
         logger.exception(e)
-
-
-from functools import wraps
-import time
 
 
 def timing(f):
@@ -104,33 +121,13 @@ def get_most_recent_message(once=False):
 
     logger.info('Start polling messages')
 
-    WAIT_TIME_MAX = 20
-
-    most_recent_message = None
-
     while True:
+        most_recent_message = get_message_from_sheet('A1')
+
         if most_recent_message:
-            wait_time = 1
-        else:
-            wait_time = WAIT_TIME_MAX
-
-        messages = receive_messages(wait_time)
-
-        if not messages and most_recent_message:
             break
-
-        for message in messages:
-
-            if most_recent_message:
-                if int(message.attributes['SentTimestamp']) > int(most_recent_message.attributes['SentTimestamp']):
-                    most_recent_message = message
-            else:
-                most_recent_message = message
-
-            message.delete()
-
-        if not messages:
-            sleep_time = 60
+        else:
+            sleep_time = 60 * 10
             logger.info('Sleeping %d %s', sleep_time, 'secs')
             time.sleep(sleep_time)  # Avoid continuously polling SQS to save bandwidth
 
@@ -138,7 +135,7 @@ def get_most_recent_message(once=False):
             break
 
     if most_recent_message:
-        message_dict = json.loads(most_recent_message.body)
+        message_dict = json.loads(most_recent_message)
 
         with orm.db_session:
             param = message_dict['param']
@@ -152,13 +149,93 @@ def get_most_recent_message(once=False):
     return message_dict
 
 
+class InitPygsheets:
+    _sh = None
+
+    @classmethod
+    def init_pygsheets(cls):
+
+        if not cls._sh:
+            try:
+                cls._get_work_sheet()
+            except Exception as e:
+                logger.exception(e)
+                cls._sh = None
+
+        return cls._sh
+
+    @classmethod
+    def reset_pygsheets(cls):
+        logger.info('Reset pygsheets')
+        cls._sh = None
+
+    @classmethod
+    @timing
+    def _get_work_sheet(cls):
+        logger.info('Init pygsheets')
+        gc = pygsheets.authorize(
+            outh_file=config.SHEET_OAUTH_FILE,
+            outh_nonlocal=True)
+        cls._sh = gc.open_by_key(config.SHEET_KEY)
+
+
 @timing
-def receive_messages(wait_time):
-    try:
-        messages = queue.receive_messages(
-            WaitTimeSeconds=wait_time, MaxNumberOfMessages=10, AttributeNames=['SentTimestamp'])
-        logger.info('receive_messages: got %d messages' % len(messages))
-    except BotoCoreError as e:
-        logger.warn('receive_messages: %s', e)
-        messages = []
-    return messages
+def get_message_from_sheet(cell):
+    sh = InitPygsheets.init_pygsheets()
+    cell_value = ''
+
+    if sh:
+        try:
+            wks = sh[4]
+            cell_value = wks.cell(cell).value_unformatted
+            if cell_value:
+                wks.update_cell(cell, '')
+        except pygsheets.exceptions.RequestError as e:
+            logger.exception(e)
+        except Exception as e:
+            logger.exception(e)
+            InitPygsheets.reset_pygsheets()
+
+    return cell_value
+
+
+@timing
+def get_ulkoilma():
+    sh = InitPygsheets.init_pygsheets()
+
+    temp, ts = None, None
+
+    if sh:
+        try:
+            wks = sh[2]
+            ts, temp = wks.range('B2:C2')[0]
+            ts = ts.value_unformatted
+            temp = temp.value_unformatted
+        except pygsheets.exceptions.RequestError as e:
+            logger.exception(e)
+        except Exception as e:
+            logger.exception(e)
+            InitPygsheets.reset_pygsheets()
+
+    return temp, ts
+
+
+@timing
+def get_wc():
+    sh = InitPygsheets.init_pygsheets()
+
+    temp, ts = None, None
+
+    if sh:
+        try:
+            wks = sh[0]
+            ts, temp = wks.range('B2:C2')[0]
+            ts = ts.value_unformatted
+            temp = temp.value_unformatted
+        except pygsheets.exceptions.RequestError as e:
+            logger.exception(e)
+        except Exception as e:
+            logger.exception(e)
+            InitPygsheets.reset_pygsheets()
+
+    return temp, ts
