@@ -1,10 +1,9 @@
 # coding=utf-8
 TIMEZONE = 'Europe/Helsinki'
-AWS_ACCESS_KEY_ID = 'examplekeyid'
-AWS_SECRET_ACCESS_KEY = 'exampleaccesskey'
-AWS_SQS_QUEUE_NAME = 'queue-name'
-AWS_REGION_NAME = 'eu-central-1'
+SHEET_OAUTH_FILE = ''
+SHEET_KEY = ''
 FMI_KEY = '12345678-1234-1234-1234-123456789012'
 FMI_LOCATION = 'tampere'
 YAHOO_LOCATION = 'tampere'
 YR_NO_LOCATION = 'Finland/Western_Finland/Tampere'
+EMAIL_ADDRESSES = []
