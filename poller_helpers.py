@@ -171,6 +171,7 @@ class InitPygsheets:
         cls._sh = None
 
     @classmethod
+    @retry(tries=3, delay=30)
     @timing
     def _get_work_sheet(cls):
         logger.info('Init pygsheets')
