@@ -11,7 +11,8 @@ from arrow.parser import ParserError
 from dateutil import tz
 
 import config
-from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_ulkoilma, get_wc
+from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_ulkoilma, get_wc, \
+    get_url
 from states import State
 
 
@@ -47,7 +48,7 @@ def receive_yahoo_temperature():
             yql_query = "select item.condition from weather.forecast where woeid in (select woeid from geo.places(1) " \
                         "where text='{location}') and u='c'".format(location=config.YAHOO_LOCATION)
             yql_query_encoded = urlencode({'q': yql_query})
-            result = requests.get('https://query.yahooapis.com/v1/public/yql?' + yql_query_encoded + '&format=json')
+            result = get_url('https://query.yahooapis.com/v1/public/yql?' + yql_query_encoded + '&format=json')
         except Exception as e:
             logger.exception(e)
         else:

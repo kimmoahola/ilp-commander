@@ -9,6 +9,7 @@ from subprocess import Popen, PIPE
 
 import arrow
 import pygsheets
+import requests
 from pony import orm
 from retry import retry
 
@@ -129,7 +130,7 @@ def get_most_recent_message(once=False):
         else:
             sleep_time = 60 * 10
             logger.info('Sleeping %d %s', sleep_time, 'secs')
-            time.sleep(sleep_time)  # Avoid continuously polling SQS to save bandwidth
+            time.sleep(sleep_time)
 
         if once:
             break
@@ -179,6 +180,11 @@ class InitPygsheets:
         cls._sh = gc.open_by_key(config.SHEET_KEY)
 
 
+@retry(tries=3, delay=10)
+def get_url(url):
+    return requests.get(url)
+
+
 @timing
 def get_message_from_sheet(cell):
     sh = InitPygsheets.init_pygsheets()
@@ -190,6 +196,9 @@ def get_message_from_sheet(cell):
             cell_value = wks.cell(cell).value_unformatted
             if cell_value:
                 wks.update_cell(cell, '')
+
+            get_url(config.HEALTHCHECK_URL_MESSAGE)
+
         except pygsheets.exceptions.RequestError as e:
             logger.exception(e)
         except Exception as e:
