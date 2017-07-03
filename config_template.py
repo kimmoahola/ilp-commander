@@ -7,4 +7,5 @@ FMI_LOCATION = 'tampere'
 YAHOO_LOCATION = 'tampere'
 YR_NO_LOCATION = 'Finland/Western_Finland/Tampere'
 EMAIL_ADDRESSES = []
-HEALTHCHECK_URL = ''
+HEALTHCHECK_URL_CRON = ''
+HEALTHCHECK_URL_MESSAGE = ''
