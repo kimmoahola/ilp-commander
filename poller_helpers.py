@@ -218,7 +218,7 @@ def get_temp_from_sheet(sheet_index):
     if sh:
         try:
             wks = sh[sheet_index]
-            ts_and_temp = wks.range('B2:C2')
+            ts_and_temp = wks.range('B2:C2')[0]
             if len(ts_and_temp) == 2:
                 ts, temp = ts_and_temp
                 ts = ts.value_unformatted
