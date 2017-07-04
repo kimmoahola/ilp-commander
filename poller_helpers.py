@@ -210,38 +210,19 @@ def get_message_from_sheet(cell):
 
 
 @timing
-def get_ulkoilma():
+def get_temp_from_sheet(sheet_index):
     sh = InitPygsheets.init_pygsheets()
 
     temp, ts = None, None
 
     if sh:
         try:
-            wks = sh[2]
-            ts, temp = wks.range('B2:C2')[0]
-            ts = ts.value_unformatted
-            temp = temp.value_unformatted
-        except pygsheets.exceptions.RequestError as e:
-            logger.exception(e)
-        except Exception as e:
-            logger.exception(e)
-            InitPygsheets.reset_pygsheets()
-
-    return temp, ts
-
-
-@timing
-def get_wc():
-    sh = InitPygsheets.init_pygsheets()
-
-    temp, ts = None, None
-
-    if sh:
-        try:
-            wks = sh[0]
-            ts, temp = wks.range('B2:C2')[0]
-            ts = ts.value_unformatted
-            temp = temp.value_unformatted
+            wks = sh[sheet_index]
+            ts_and_temp = wks.range('B2:C2')
+            if len(ts_and_temp) == 2:
+                ts, temp = ts_and_temp
+                ts = ts.value_unformatted
+                temp = temp.value_unformatted
         except pygsheets.exceptions.RequestError as e:
             logger.exception(e)
         except Exception as e:
