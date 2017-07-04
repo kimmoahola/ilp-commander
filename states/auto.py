@@ -11,8 +11,8 @@ from arrow.parser import ParserError
 from dateutil import tz
 
 import config
-from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_ulkoilma, get_wc, \
-    get_url
+from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_url, \
+    get_temp_from_sheet
 from states import State
 
 
@@ -79,7 +79,7 @@ def receive_ulkoilma_temperature():
     if content:
         temp, ts = content
     else:
-        temp, ts = get_ulkoilma()
+        temp, ts = get_temp_from_sheet(sheet_index=2)
 
         if ts is not None and temp is not None:
             ts = arrow.get(ts, 'DD.MM.YYYY klo HH:mm').replace(tzinfo=tz.gettz(config.TIMEZONE))
@@ -99,7 +99,7 @@ def receive_wc_temperature():
     if content:
         temp, ts = content
     else:
-        temp, ts = get_wc()
+        temp, ts = get_temp_from_sheet(sheet_index=0)
 
         if ts is not None and temp is not None:
             ts = arrow.get(ts, 'DD.MM.YYYY klo HH:mm').replace(tzinfo=tz.gettz(config.TIMEZONE))
@@ -220,8 +220,8 @@ class Auto(State):
                     next_command = Commands.heat20
 
             else:
-                logger.error('Got no temperatures at all. Setting %s', Commands.heat16)
                 next_command = Commands.heat16  # Don't know the temperature so heat up just in case
+                logger.error('Got no temperatures at all. Setting %s', next_command)
 
         else:
             logger.info('Inside temperature: %.1f', inside_temp)
