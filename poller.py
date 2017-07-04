@@ -55,12 +55,10 @@ def run():
 
     while True:
         state = state_klass()
-        logger.info('State %s run', state.__class__.__name__)
-        logger.debug('State %s payload in: %s', state.__class__.__name__, payload)
         payload = state.run(payload)
-        logger.debug('State %s payload out: %s', state.__class__.__name__, payload)
-        logger.info('State %s nex', state.__class__.__name__)
+        last_state_klass = state_klass
         state_klass = state.nex(payload)
+        logger.info('State %s -> %s. Payload: %s', last_state_klass.__name__, state_klass.__name__, payload)
 
 
 if __name__ == '__main__':

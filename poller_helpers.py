@@ -83,7 +83,7 @@ def email(addresses, subject, message):
             logger.exception(e)
 
 
-def send_ir_signal(command):
+def send_ir_signal(command: str, extra_info: str = ''):
     logger.info(command)
     actually_send_ir_signal(command)
     time.sleep(5)
@@ -94,10 +94,10 @@ def send_ir_signal(command):
     email(
         config.EMAIL_ADDRESSES,
         'Send IR %s' % command,
-        'Send IR %s at %s' % (command, arrow.now().format('DD.MM.YYYY HH:mm')))
+        'Send IR %s at %s %s' % (command, arrow.now().format('DD.MM.YYYY HH:mm'), extra_info))
 
 
-def actually_send_ir_signal(command):
+def actually_send_ir_signal(command: str):
     try:
         p = Popen(['irsend', 'SEND_ONCE', 'ilp', command], stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output, err = p.communicate('')

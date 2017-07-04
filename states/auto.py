@@ -183,7 +183,7 @@ class Temperatures:
                 if abs(seconds) < 60 * cls.MAX_TS_DIFF_MINUTES:
                     temperatures.append(temp)
                 else:
-                    logger.info('Discarding temperature %s %s %s', func, ts, temp)
+                    logger.info('Discarding temperature %s, temp: %s, temp time: %s', func.__name__, ts, temp)
 
         if temperatures:
             return median(temperatures)
@@ -199,14 +199,18 @@ class Auto(State):
     def run(self, payload):
 
         inside_temp = Temperatures.get_temp([receive_wc_temperature])
+        logger.info('Inside temperature: %s', inside_temp)
+        extra_info = 'Inside temperature: %s' % inside_temp
 
         if inside_temp is None or inside_temp < 8:
 
             outside_temp = Temperatures.get_temp([
                 receive_ulkoilma_temperature, receive_yahoo_temperature, receive_fmi_temperature])
 
+            extra_info += '  Outside temperature: %s' % outside_temp
+
             if outside_temp is not None:
-                logger.info('Outside median temperature: %.1f', outside_temp)
+                logger.info('Outside temperature: %.1f', outside_temp)
 
                 if outside_temp > 0:
                     next_command = Commands.off
@@ -222,9 +226,9 @@ class Auto(State):
             else:
                 next_command = Commands.heat16  # Don't know the temperature so heat up just in case
                 logger.error('Got no temperatures at all. Setting %s', next_command)
+                extra_info += '  Got no temperatures at all. Setting %s' % next_command
 
         else:
-            logger.info('Inside temperature: %.1f', inside_temp)
             next_command = Commands.off  # No need to heat
 
         if Auto.last_command is not None:
@@ -233,7 +237,7 @@ class Auto(State):
         if Auto.last_command != next_command:
             Auto.last_command = next_command
             Auto.last_command_send_time = time.time()
-            send_ir_signal(next_command)
+            send_ir_signal(next_command, extra_info=extra_info)
 
         return get_most_recent_message(once=True)
 
