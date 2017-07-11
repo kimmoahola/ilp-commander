@@ -9,3 +9,9 @@ YR_NO_LOCATION = 'Finland/Western_Finland/Tampere'
 EMAIL_ADDRESSES = []
 HEALTHCHECK_URL_CRON = ''
 HEALTHCHECK_URL_MESSAGE = ''
+CACHE_TIMES = {
+    'yahoo': 95,
+    'ulkoilma': 25,
+    'wc': 15,
+    'fmi': 15,
+}
