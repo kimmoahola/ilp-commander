@@ -200,8 +200,8 @@ def get_message_from_sheet(cell):
 
             get_url(config.HEALTHCHECK_URL_MESSAGE)
 
-        except pygsheets.exceptions.RequestError as e:
-            logger.exception(e)
+        except (pygsheets.exceptions.RequestError, ConnectionResetError):
+            pass
         except Exception as e:
             logger.exception(e)
             InitPygsheets.reset_pygsheets()
