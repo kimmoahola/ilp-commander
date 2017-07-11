@@ -86,10 +86,6 @@ def email(addresses, subject, message):
 def send_ir_signal(command: str, extra_info: str = ''):
     logger.info(command)
     actually_send_ir_signal(command)
-    time.sleep(5)
-    actually_send_ir_signal(command)
-    time.sleep(5)
-    actually_send_ir_signal(command)
 
     email(
         config.EMAIL_ADDRESSES,
