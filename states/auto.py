@@ -65,7 +65,7 @@ def receive_yahoo_temperature():
                         from dateutil.tz import gettz
                         ts = arrow.get(condition_['date'], 'DD MMM YYYY HH:mm A').replace(tzinfo=gettz(config.TIMEZONE))
 
-                rq.put('yahoo', ts.shift(minutes=95), (temp, ts))
+                rq.put('yahoo', ts.shift(minutes=config.CACHE_TIMES.get('yahoo', 95)), (temp, ts))
 
     logger.info('%s %s', temp, ts)
     return temp, ts
@@ -85,7 +85,7 @@ def receive_ulkoilma_temperature():
             ts = arrow.get(ts, 'DD.MM.YYYY klo HH:mm').replace(tzinfo=tz.gettz(config.TIMEZONE))
             temp = Decimal(temp)
 
-            rq.put('ulkoilma', ts.shift(minutes=25), (temp, ts))
+            rq.put('ulkoilma', ts.shift(minutes=config.CACHE_TIMES.get('ulkoilma', 25)), (temp, ts))
 
     logger.info('%s %s', temp, ts)
     return temp, ts
@@ -105,7 +105,7 @@ def receive_wc_temperature():
             ts = arrow.get(ts, 'DD.MM.YYYY klo HH:mm').replace(tzinfo=tz.gettz(config.TIMEZONE))
             temp = Decimal(temp)
 
-            rq.put('wc', ts.shift(minutes=25), (temp, ts))
+            rq.put('wc', ts.shift(minutes=config.CACHE_TIMES.get('wc', 15)), (temp, ts))
 
     logger.info('%s %s', temp, ts)
     return temp, ts
@@ -135,7 +135,7 @@ def receive_fmi_temperature():
                 temp_data = xmltodict.parse(result.content)['wfs:FeatureCollection']['wfs:member'][-1]['BsWfs:BsWfsElement']
                 ts = arrow.get(temp_data['BsWfs:Time'])
                 temp = Decimal(temp_data['BsWfs:ParameterValue'])
-                rq.put('fmi', ts.shift(minutes=15), (temp, ts))
+                rq.put('fmi', ts.shift(minutes=config.CACHE_TIMES.get('fmi', 15)), (temp, ts))
 
     logger.info('%s %s', temp, ts)
     return temp, ts
