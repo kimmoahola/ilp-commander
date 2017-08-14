@@ -1,4 +1,4 @@
-0 10 * * * root su - pi -c 'cd ~/ilp-commander/ && git pull --quiet' && cd /home/pi/ilp-commander/ && sh install_or_update.sh
+# 0 10 * * * root su - pi -c 'cd ~/ilp-commander/ && git pull --quiet' && cd /home/pi/ilp-commander/ && sh install_or_update.sh
 
 11 10 * * * root find /var/log/supervisor/ -name 'ilp-commander-*' -mtime -1 | xargs tail -n 60 -q | mail -E -s "ilp-commander output" pi
 
