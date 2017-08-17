@@ -4,6 +4,7 @@ python:
 
 install:
   - pip install -r requirements.txt
+  - cp config_template.py config.py
 
 script:
   - py.test --durations 3
