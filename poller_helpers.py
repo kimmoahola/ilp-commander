@@ -119,7 +119,7 @@ def get_most_recent_message(once=False):
     logger.info('Start polling messages')
 
     while True:
-        most_recent_message = get_message_from_sheet('A1')
+        most_recent_message = get_message_from_sheet()
 
         if most_recent_message:
             break
@@ -183,13 +183,14 @@ def get_url(url):
 
 
 @timing
-def get_message_from_sheet(cell):
+def get_message_from_sheet():
     sh = InitPygsheets.init_pygsheets()
     cell_value = ''
+    cell = config.MESSAGE_SHEET_CELL
 
     if sh:
         try:
-            wks = sh[4]
+            wks = sh[config.MESSAGE_SHEET_INDEX]
             cell_value = wks.cell(cell).value_unformatted
             if cell_value:
                 wks.update_cell(cell, '')
