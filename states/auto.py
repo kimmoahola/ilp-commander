@@ -169,6 +169,13 @@ def receive_fmi_temperature():
 #     return None
 
 
+def func_name(func):
+    if hasattr(func, '__name__'):
+        return func.__name__
+    else:
+        return func._mock_name
+
+
 class Temperatures:
     MAX_TS_DIFF_MINUTES = 60
 
@@ -183,7 +190,7 @@ class Temperatures:
                 if abs(seconds) < 60 * cls.MAX_TS_DIFF_MINUTES:
                     temperatures.append(temp)
                 else:
-                    logger.info('Discarding temperature %s, temp: %s, temp time: %s', func.__name__, ts, temp)
+                    logger.info('Discarding temperature %s, temp: %s, temp time: %s', func_name(func), temp, ts)
 
         if temperatures:
             return median(temperatures)
