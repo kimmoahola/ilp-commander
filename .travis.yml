@@ -7,4 +7,4 @@ install:
   - cp config_template.py config.py
 
 script:
-  - py.test --durations 3
+  - py.test -v --durations 3

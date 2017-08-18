@@ -40,23 +40,23 @@ class Commands:
 
     @staticmethod
     def find_command_just_above_temp(temp: Decimal):
-        if temp > 28:
+        if temp >= 28:
             return Commands.heat30
-        if temp > 26:
+        if temp >= 26:
             return Commands.heat28
-        if temp > 24:
+        if temp >= 24:
             return Commands.heat26
-        if temp > 22:
+        if temp >= 22:
             return Commands.heat24
-        if temp > 20:
+        if temp >= 20:
             return Commands.heat22
-        if temp > 18:
+        if temp >= 18:
             return Commands.heat20
-        if temp > 16:
+        if temp >= 16:
             return Commands.heat18
-        if temp > 10:
+        if temp >= 10:
             return Commands.heat16
-        if temp > 8:
+        if temp >= 8:
             return Commands.heat10
 
         return Commands.heat8
@@ -203,7 +203,7 @@ class InitPygsheets:
 
 @retry(tries=3, delay=10)
 def get_url(url):
-    return requests.get(url)
+    return requests.get(url, timeout=60)
 
 
 @timing
