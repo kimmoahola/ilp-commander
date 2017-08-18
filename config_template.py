@@ -16,4 +16,5 @@ CACHE_TIMES = {
     'ulkoilma': 25,
     'wc': 15,
     'fmi': 15,
+    'yr.no': 6 * 60,
 }
