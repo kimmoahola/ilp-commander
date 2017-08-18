@@ -10,6 +10,7 @@ from subprocess import Popen, PIPE
 import arrow
 import pygsheets
 import requests
+from decimal import Decimal
 from pony import orm
 from retry import retry
 
@@ -36,6 +37,29 @@ class Commands:
     heat26 = 'heat_26__fan_auto__swing_auto'
     heat28 = 'heat_28__fan_auto__swing_auto'
     heat30 = 'heat_30__fan_auto__swing_auto'
+
+    @staticmethod
+    def find_command_just_above_temp(temp: Decimal):
+        if temp > 28:
+            return Commands.heat30
+        if temp > 26:
+            return Commands.heat28
+        if temp > 24:
+            return Commands.heat26
+        if temp > 22:
+            return Commands.heat24
+        if temp > 20:
+            return Commands.heat22
+        if temp > 18:
+            return Commands.heat20
+        if temp > 16:
+            return Commands.heat18
+        if temp > 10:
+            return Commands.heat16
+        if temp > 8:
+            return Commands.heat10
+
+        return Commands.heat8
 
 
 db = orm.Database()
