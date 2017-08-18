@@ -1,7 +1,7 @@
 # coding=utf-8
 import time
 from decimal import Decimal
-from statistics import median
+from statistics import median, mean
 from urllib.parse import urlencode
 
 import arrow
@@ -198,13 +198,49 @@ class Temperatures:
             return None
 
 
+def target_inside_temperature(outside_temp: Decimal, allowed_min_inside_temp: Decimal):
+    COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF = Decimal('0.018')
+    COOLING_TIME_BUFFER = Decimal(24)  # hours
+
+    def foo(result: Decimal, count: int) -> Decimal:
+        if count > 0:
+            inside_outside_diff = mean([result - outside_temp, allowed_min_inside_temp - outside_temp])
+            new_result = \
+                COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF \
+                * inside_outside_diff \
+                * COOLING_TIME_BUFFER \
+                + allowed_min_inside_temp
+            return foo(new_result, count - 1)
+        return result
+
+    return max(foo(allowed_min_inside_temp, 3), Decimal(6))
+
+
 class Auto(State):
 
     last_command = None
     last_command_send_time = time.time()
 
-    def run(self, payload):
+    def run(self, payload, version=2):
+        if version == 1:
+            next_command, extra_info = self.version_1()
+        elif version == 2:
+            next_command, extra_info = self.version_2()
+        else:
+            raise ValueError(version)
 
+        if Auto.last_command is not None:
+            logger.debug('Last auto command sent %d minutes ago', (time.time() - Auto.last_command_send_time) / 60.0)
+
+        if Auto.last_command != next_command:
+            Auto.last_command = next_command
+            Auto.last_command_send_time = time.time()
+            send_ir_signal(next_command, extra_info=extra_info)
+
+        return get_most_recent_message(once=True)
+
+    @staticmethod
+    def version_1():
         inside_temp = Temperatures.get_temp([receive_wc_temperature])
         logger.info('Inside temperature: %s', inside_temp)
         extra_info = 'Inside temperature: %s' % inside_temp
@@ -238,15 +274,39 @@ class Auto(State):
         else:
             next_command = Commands.off  # No need to heat
 
-        if Auto.last_command is not None:
-            logger.debug('Last auto command sent %d minutes ago', (time.time() - Auto.last_command_send_time) / 60.0)
+        return next_command, extra_info
 
-        if Auto.last_command != next_command:
-            Auto.last_command = next_command
-            Auto.last_command_send_time = time.time()
-            send_ir_signal(next_command, extra_info=extra_info)
+    @staticmethod
+    def version_2():
+        allowed_min_inside_temp = Decimal(20)
 
-        return get_most_recent_message(once=True)
+        outside_temp = Temperatures.get_temp([
+            receive_ulkoilma_temperature, receive_yahoo_temperature, receive_fmi_temperature])
+        logger.info('Outside temperature: %s', outside_temp)
+        extra_info = 'Outside temperature: %s' % outside_temp
+
+        if outside_temp is not None:
+            target_inside_temp = target_inside_temperature(outside_temp, allowed_min_inside_temp)
+            logger.info('Target inside temperature: %s', target_inside_temp)
+            extra_info += '  Target inside temperature: %s' % target_inside_temp.quantize(Decimal('.1'))
+
+            inside_temp = Temperatures.get_temp([receive_wc_temperature])
+            logger.info('Inside temperature: %s', inside_temp)
+            extra_info += '  Inside temperature: %s' % inside_temp
+
+            if inside_temp is not None:
+                if inside_temp < target_inside_temp:
+                    next_command = Commands.find_command_just_above_temp(target_inside_temp)
+                else:
+                    next_command = Commands.off
+
+            else:
+                next_command = Commands.find_command_just_above_temp(target_inside_temp)
+
+        else:
+            next_command = Commands.find_command_just_above_temp(allowed_min_inside_temp)
+
+        return next_command, extra_info
 
     def nex(self, payload):
         from states.manual import Manual
