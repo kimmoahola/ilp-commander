@@ -251,3 +251,21 @@ def get_temp_from_sheet(sheet_index):
             InitPygsheets.reset_pygsheets()
 
     return temp, ts
+
+
+def median(data):
+    data = sorted(data, key=lambda r: r[0])
+    n = len(data)
+
+    if n == 0:
+        temp = None
+        ts = None
+    elif n % 2 == 1:
+        temp, ts = data[n // 2]
+    else:
+        i = n // 2
+        temp = (data[i - 1][0] + data[i][0]) / 2
+        secs = abs((data[i - 1][1] - data[i][1]).total_seconds() / 2)
+        ts = data[i - 1][1].shift(seconds=secs)
+
+    return temp, ts
