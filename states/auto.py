@@ -1,7 +1,7 @@
 # coding=utf-8
 import time
 from decimal import Decimal
-from statistics import median, mean
+from statistics import mean
 from urllib.parse import urlencode
 
 import arrow
@@ -12,7 +12,7 @@ from dateutil import tz
 
 import config
 from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_url, \
-    get_temp_from_sheet
+    get_temp_from_sheet, median
 from states import State
 
 
@@ -37,6 +37,10 @@ class RequestCache:
                 return content
 
         return None
+
+    @classmethod
+    def reset(cls):
+        cls._cache.clear()
 
 
 @timing
@@ -146,7 +150,7 @@ def receive_fmi_temperature():
 
 
 @timing
-def receive_yr_no_forecast_min_temperature():
+def receive_yr_no_forecast_min_temperature(hours=None):
     temp, ts = None, None
 
     rq = RequestCache()
@@ -167,18 +171,30 @@ def receive_yr_no_forecast_min_temperature():
             else:
                 d = xmltodict.parse(result.content)
                 timezone = d['weatherdata']['location']['timezone']['@id']
-                time_elements = d['weatherdata']['forecast']['tabular']['time']
+
+                if hours is None:
+                    until_ts = None
+                else:
+                    until_ts = arrow.now().shift(hours=hours)
+
+                time_elements = [
+                    t
+                    for t
+                    in d['weatherdata']['forecast']['tabular']['time']
+                    if until_ts is None or arrow.get(t['@from']).replace(tzinfo=timezone) < until_ts
+                ]
+
                 temp = min(Decimal(t['temperature']['@value']) for t in time_elements)
                 min_datetime = arrow.get(min(t['@from'] for t in time_elements)).replace(tzinfo=timezone)
                 max_datetime = arrow.get(max(t['@to'] for t in time_elements)).replace(tzinfo=timezone)
                 ts = arrow.now()
 
                 logger.info('Min forecast temp: %s between %s and %s', temp, min_datetime, max_datetime)
-                rq.put('yr.no', ts.shift(minutes=config.CACHE_TIMES.get('yr.no', 6 * 60)), (temp, ts))
+                rq.put('yr.no', ts.shift(minutes=config.CACHE_TIMES.get('yr.no', 60)), (temp, ts))
         else:
             temp, ts = rq.get('yr.no', ignore_stale_check=True)
 
-            stale_after = ts.shift(hours=48)
+            stale_after = ts.shift(hours=24)
             if arrow.now() > stale_after:
                 temp, ts = None, None
 
@@ -197,25 +213,25 @@ class Temperatures:
     MAX_TS_DIFF_MINUTES = 60
 
     @classmethod
-    def get_temp(cls, functions: list):
+    def get_temp(cls, functions: list, max_ts_diff=None, **kwargs):
+        if max_ts_diff is None:
+            max_ts_diff = cls.MAX_TS_DIFF_MINUTES
+
         temperatures = []
 
         for func in functions:
-            temp, ts = func()
+            temp, ts = func(**kwargs)
             if temp is not None:
                 if ts is None:
-                    temperatures.append(temp)
+                    temperatures.append((temp, ts))
                 else:
                     seconds = (arrow.now() - ts).total_seconds()
-                    if abs(seconds) < 60 * cls.MAX_TS_DIFF_MINUTES:
-                        temperatures.append(temp)
+                    if abs(seconds) < 60 * max_ts_diff:
+                        temperatures.append((temp, ts))
                     else:
                         logger.info('Discarding temperature %s, temp: %s, temp time: %s', func_name(func), temp, ts)
 
-        if temperatures:
-            return median(temperatures)
-        else:
-            return None
+        return median(temperatures)
 
 
 def target_inside_temperature(outside_temp: Decimal, allowed_min_inside_temp: Decimal):
@@ -262,14 +278,14 @@ class Auto(State):
 
     @staticmethod
     def version_1():
-        inside_temp = Temperatures.get_temp([receive_wc_temperature])
+        inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
         logger.info('Inside temperature: %s', inside_temp)
         extra_info = 'Inside temperature: %s' % inside_temp
 
         if inside_temp is None or inside_temp < 8:
 
             outside_temp = Temperatures.get_temp([
-                receive_ulkoilma_temperature, receive_yahoo_temperature, receive_fmi_temperature])
+                receive_ulkoilma_temperature, receive_yahoo_temperature, receive_fmi_temperature])[0]
 
             extra_info += '  Outside temperature: %s' % outside_temp
 
@@ -299,11 +315,11 @@ class Auto(State):
 
     @staticmethod
     def version_2():
-        Auto.min_forecast_temp = Temperatures.get_temp([receive_yr_no_forecast_min_temperature])
+        Auto.min_forecast_temp = Temperatures.get_temp([receive_yr_no_forecast_min_temperature], hours=24)[0]
         allowed_min_inside_temp = Decimal(0)
 
         outside_temp = Temperatures.get_temp([
-            receive_ulkoilma_temperature, receive_yahoo_temperature, receive_fmi_temperature])
+            receive_ulkoilma_temperature, receive_yahoo_temperature, receive_fmi_temperature])[0]
         logger.info('Outside temperature: %s', outside_temp)
         extra_info = 'Outside temperature: %s' % outside_temp
 
@@ -320,7 +336,7 @@ class Auto(State):
             if outside_temp >= target_inside_temp:
                 next_command = Commands.off
             else:
-                inside_temp = Temperatures.get_temp([receive_wc_temperature])
+                inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
                 logger.info('Inside temperature: %s', inside_temp)
                 extra_info += '  Inside temperature: %s' % inside_temp
 
