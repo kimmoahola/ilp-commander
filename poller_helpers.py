@@ -119,7 +119,7 @@ def send_ir_signal(command: str, extra_info: list = None):
     email(
         config.EMAIL_ADDRESSES,
         'Send IR %s' % command,
-        'Send IR %s at %s %s' % (command, arrow.now().format('DD.MM.YYYY HH:mm'), message))
+        'Send IR %s at %s\n%s' % (command, arrow.now().format('DD.MM.YYYY HH:mm'), message))
 
 
 def actually_send_ir_signal(command: str):
