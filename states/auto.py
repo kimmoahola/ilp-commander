@@ -55,8 +55,9 @@ def caching(cache_name):
                 result = f(*args, **kw)
                 if result:
                     temp, ts = result
-                    logger.debug('func:%r args:[%r, %r] storing with result: %r' % (f.__name__, args, kw, result))
-                    rq.put(cache_name, ts.shift(minutes=config.CACHE_TIMES.get(cache_name, 60)), result)
+                    if ts is not None:
+                        logger.debug('func:%r args:[%r, %r] storing with result: %r' % (f.__name__, args, kw, result))
+                        rq.put(cache_name, ts.shift(minutes=config.CACHE_TIMES.get(cache_name, 60)), result)
             return result
         return caching_wrap
     return caching_inner
@@ -196,21 +197,19 @@ class Temperatures:
 
 
 def target_inside_temperature(outside_temp: Decimal, allowed_min_inside_temp: Decimal):
-    COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF = Decimal('0.018')
-    COOLING_TIME_BUFFER = Decimal(24)  # hours
 
     def foo(result: Decimal, count: int) -> Decimal:
         if count > 0:
             inside_outside_diff = mean([result - outside_temp, allowed_min_inside_temp - outside_temp])
             new_result = \
-                COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF \
+                config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF \
                 * inside_outside_diff \
-                * COOLING_TIME_BUFFER \
+                * config.COOLING_TIME_BUFFER \
                 + allowed_min_inside_temp
             return foo(new_result, count - 1)
         return result
 
-    return max(foo(allowed_min_inside_temp, 3), Decimal(6))
+    return max(foo(allowed_min_inside_temp, 3), config.MINIMUM_INSIDE_TEMP)
 
 
 class Auto(State):
@@ -241,13 +240,13 @@ class Auto(State):
     def version_1():
         inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
         logger.info('Inside temperature: %s', inside_temp)
-        extra_info = 'Inside temperature: %s' % inside_temp
+        extra_info = ['Inside temperature: %s' % inside_temp]
 
         if inside_temp is None or inside_temp < 8:
 
             outside_temp = Temperatures.get_temp([receive_ulkoilma_temperature, receive_fmi_temperature])[0]
 
-            extra_info += '  Outside temperature: %s' % outside_temp
+            extra_info.append('Outside temperature: %s' % outside_temp)
 
             if outside_temp is not None:
                 logger.info('Outside temperature: %.1f', outside_temp)
@@ -266,7 +265,7 @@ class Auto(State):
             else:
                 next_command = Commands.heat16  # Don't know the temperature so heat up just in case
                 logger.error('Got no temperatures at all. Setting %s', next_command)
-                extra_info += '  Got no temperatures at all. Setting %s' % next_command
+                extra_info.append('Got no temperatures at all.')
 
         else:
             next_command = Commands.off  # No need to heat
@@ -277,39 +276,37 @@ class Auto(State):
     def version_2():
         Auto.min_forecast_temp = Temperatures.get_temp([receive_yr_no_forecast_min_temperature], hours=24)[0]
         allowed_min_inside_temp = Decimal(1)
+        extra_info = ['Forecast min temperature: %s' % Auto.min_forecast_temp]
 
         outside_temp = Temperatures.get_temp([receive_ulkoilma_temperature, receive_fmi_temperature])[0]
         logger.info('Outside temperature: %s', outside_temp)
-        extra_info = 'Outside temperature: %s' % outside_temp
+        extra_info.append('Outside temperature: %s' % outside_temp)
 
         if outside_temp is None:
-            outside_temp = Auto.min_forecast_temp
-            logger.info('Using forecast: %s', Auto.min_forecast_temp)
-            extra_info += '  Using forecast: %s' % Auto.min_forecast_temp
-
-        if outside_temp is not None:
-            target_inside_temp = target_inside_temperature(outside_temp, allowed_min_inside_temp)
-            logger.info('Target inside temperature: %s', target_inside_temp)
-            extra_info += '  Target inside temperature: %s' % target_inside_temp.quantize(Decimal('.1'))
-
-            if outside_temp >= target_inside_temp:
-                next_command = Commands.off
+            if Auto.min_forecast_temp is not None:
+                outside_temp = Auto.min_forecast_temp
+                logger.info('Using forecast: %s', Auto.min_forecast_temp)
+                extra_info.append('Using forecast: %s' % Auto.min_forecast_temp)
             else:
-                inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
-                logger.info('Inside temperature: %s', inside_temp)
-                extra_info += '  Inside temperature: %s' % inside_temp
+                outside_temp = Decimal(-10)
+                logger.info('Using predefined outside temperature: %s', outside_temp)
+                extra_info.append('Using predefined outside temperature: %s' % outside_temp)
 
-                if inside_temp is not None:
-                    if inside_temp < target_inside_temp:
-                        next_command = Commands.find_command_just_above_temp(target_inside_temp)
-                    else:
-                        next_command = Commands.off
+        target_inside_temp = target_inside_temperature(outside_temp, allowed_min_inside_temp)
+        logger.info('Target inside temperature: %s', target_inside_temp)
+        extra_info.append('Target inside temperature: %s' % target_inside_temp.quantize(Decimal('.1')))
 
-                else:
-                    next_command = Commands.find_command_just_above_temp(target_inside_temp)
+        inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
+        logger.info('Inside temperature: %s', inside_temp)
+        extra_info.append('Inside temperature: %s' % inside_temp)
 
+        if inside_temp is not None:
+            if inside_temp < target_inside_temp:
+                next_command = Commands.find_command_just_above_temp(target_inside_temp)
+            else:
+                next_command = Commands.off
         else:
-            next_command = Commands.find_command_just_above_temp(allowed_min_inside_temp)
+            next_command = Commands.find_command_just_above_temp(target_inside_temp)
 
         return next_command, extra_info
 
