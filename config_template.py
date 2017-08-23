@@ -1,4 +1,6 @@
 # coding=utf-8
+from decimal import Decimal
+
 TIMEZONE = 'Europe/Helsinki'
 SHEET_OAUTH_FILE = ''
 SHEET_KEY = ''
@@ -16,3 +18,6 @@ CACHE_TIMES = {
     'fmi': 15,
     'yr.no': 60,
 }
+MINIMUM_INSIDE_TEMP = Decimal(6)
+COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF = Decimal('0.018')
+COOLING_TIME_BUFFER = Decimal(24)  # hours

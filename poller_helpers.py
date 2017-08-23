@@ -3,6 +3,7 @@ import json
 import logging
 import smtplib
 import time
+from decimal import Decimal
 from email.mime.text import MIMEText
 from functools import wraps
 from subprocess import Popen, PIPE
@@ -10,7 +11,6 @@ from subprocess import Popen, PIPE
 import arrow
 import pygsheets
 import requests
-from decimal import Decimal
 from pony import orm
 from retry import retry
 
@@ -107,14 +107,19 @@ def email(addresses, subject, message):
             logger.exception(e)
 
 
-def send_ir_signal(command: str, extra_info: str = ''):
+def send_ir_signal(command: str, extra_info: list = None):
+    if extra_info is None:
+        extra_info = []
+
     logger.info(command)
     actually_send_ir_signal(command)
+
+    message = '\n'.join(extra_info)
 
     email(
         config.EMAIL_ADDRESSES,
         'Send IR %s' % command,
-        'Send IR %s at %s %s' % (command, arrow.now().format('DD.MM.YYYY HH:mm'), extra_info))
+        'Send IR %s at %s %s' % (command, arrow.now().format('DD.MM.YYYY HH:mm'), message))
 
 
 def actually_send_ir_signal(command: str):
