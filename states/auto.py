@@ -300,13 +300,25 @@ class Auto(State):
         logger.info('Inside temperature: %s', inside_temp)
         extra_info.append('Inside temperature: %s' % inside_temp)
 
+        if inside_temp is not None and outside_temp is not None and inside_temp > outside_temp:
+            inside_outside_diff = mean([inside_temp - outside_temp, allowed_min_inside_temp - outside_temp])
+            buffer = (inside_temp - allowed_min_inside_temp) / (
+                config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * inside_outside_diff)
+            if buffer >= 0:
+                buffer = buffer.quantize(Decimal('.1'))
+                logger.info('Current buffer: %s h', buffer)
+                extra_info.append('Current buffer: %s h' % buffer)
+
         if inside_temp is not None:
-            if inside_temp < target_inside_temp:
+            if outside_temp < target_inside_temp and inside_temp < target_inside_temp:
                 next_command = Commands.find_command_just_above_temp(target_inside_temp)
             else:
                 next_command = Commands.off
         else:
-            next_command = Commands.find_command_just_above_temp(target_inside_temp)
+            if outside_temp < target_inside_temp:
+                next_command = Commands.find_command_just_above_temp(target_inside_temp)
+            else:
+                next_command = Commands.off
 
         return next_command, extra_info
 
