@@ -107,7 +107,7 @@ def receive_fmi_temperature():
             logger.error('%d: %s' % (result.status_code, result.content))
         else:
             temp_data = xmltodict.parse(result.content)['wfs:FeatureCollection']['wfs:member'][-1]['BsWfs:BsWfsElement']
-            ts = arrow.get(temp_data['BsWfs:Time'])
+            ts = arrow.get(temp_data['BsWfs:Time']).to(config.TIMEZONE)
             temp = Decimal(temp_data['BsWfs:ParameterValue'])
 
     logger.info('%s %s', temp, ts)
@@ -131,7 +131,7 @@ def receive_open_weather_map_temperature():
         else:
             result_json = result.json()
             temp = Decimal(result_json['main']['temp'])
-            ts = arrow.get(result_json['dt'])
+            ts = arrow.get(result_json['dt']).to(config.TIMEZONE)
 
     logger.info('%s %s', temp, ts)
     return temp, ts
