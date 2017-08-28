@@ -9,7 +9,7 @@ import config
 from poller_helpers import Commands, InitPygsheets
 from states.auto import receive_ulkoilma_temperature, receive_wc_temperature, \
     receive_fmi_temperature, Temperatures, Auto, target_inside_temperature, receive_yr_no_forecast_min_temperature, \
-    RequestCache
+    RequestCache, receive_open_weather_map_temperature
 
 MAX_TIME_DIFF_MINUTES = 120
 
@@ -33,7 +33,11 @@ def has_invalid_sheet():
 
 
 def has_invalid_fmi():
-    return not config.FMI_KEY or config.FMI_KEY.startswith('12345678')
+    return not config.FMI_KEY or not config.FMI_LOCATION or config.FMI_KEY.startswith('12345678')
+
+
+def has_invalid_open_weather_map():
+    return not config.OPEN_WEATHER_MAP_KEY or not config.OPEN_WEATHER_MAP_LOCATION
 
 
 class TestGeneral:
@@ -55,6 +59,11 @@ class TestGeneral:
                         reason='No FMI key in config')
     def test_receive_fmi_temperature(self):
         run_temp_test_for(receive_fmi_temperature)
+
+    @pytest.mark.skipif(has_invalid_open_weather_map(),
+                        reason='No open weather map key in config')
+    def test_receive_open_weather_map_temperature(self):
+        run_temp_test_for(receive_open_weather_map_temperature)
 
     def test_receive_yr_no_forecast_min_temperature(self):
         run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=24 * 60, hours=24)
