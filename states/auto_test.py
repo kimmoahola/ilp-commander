@@ -318,6 +318,32 @@ class TestVer2:
         mock_receive_fmi_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()
 
+    def test_auto_ver2_invalid_inside_high_outside(self, mocker):
+        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
+        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
+        mock_receive_wc_temperature = mocker.patch(
+            'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now().shift(minutes=-60)))
+        mock_receive_ulkoilma_temperature = mocker.patch(
+            'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(10), arrow.now()))
+        mock_receive_fmi_temperature = mocker.patch(
+            'states.auto.receive_fmi_temperature', return_value=(Decimal(12), arrow.now()))
+        mock_receive_yr_no_forecast_min_temperature = mocker.patch(
+            'states.auto.receive_yr_no_forecast_min_temperature', return_value=(Decimal(9), arrow.now()))
+
+        auto = Auto()
+        auto.run({}, version=2)
+        Auto.last_command = None
+
+        mock_send_ir_signal.assert_called_once_with(
+            Commands.off,
+            extra_info=['Forecast min temperature: 9', 'Outside temperature: 11',
+                        'Target inside temperature: 6.0', 'Inside temperature: None'])
+        mock_get_most_recent_message.assert_called_once_with(once=True)
+        mock_receive_wc_temperature.assert_called_once()
+        mock_receive_ulkoilma_temperature.assert_called_once()
+        mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_yr_no_forecast_min_temperature.assert_called_once()
+
     def test_auto_ver2_invalid_outside_high_forecast(self, mocker):
         mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
         mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
@@ -362,7 +388,7 @@ class TestVer2:
         mock_send_ir_signal.assert_called_once_with(
             Commands.off,
             extra_info=['Forecast min temperature: 2', 'Outside temperature: None', 'Using forecast: 2',
-                        'Target inside temperature: 6.0', 'Inside temperature: 8'])
+                        'Target inside temperature: 6.0', 'Inside temperature: 8', 'Current buffer: 155.6 h'])
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
@@ -438,7 +464,7 @@ class TestVer2:
         Auto.last_command = None
 
         mock_send_ir_signal.assert_called_once_with(
-            Commands.heat8,
+            Commands.off,
             extra_info=['Forecast min temperature: None', 'Outside temperature: 7',
                         'Target inside temperature: 6.0', 'Inside temperature: 5.5'])
         mock_get_most_recent_message.assert_called_once_with(once=True)
@@ -466,7 +492,7 @@ class TestVer2:
         mock_send_ir_signal.assert_called_once_with(
             Commands.heat8,
             extra_info=['Forecast min temperature: None', 'Outside temperature: -5',
-                        'Target inside temperature: 6.0', 'Inside temperature: 2'])
+                        'Target inside temperature: 6.0', 'Inside temperature: 2', 'Current buffer: 8.5 h'])
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
@@ -492,7 +518,7 @@ class TestVer2:
         mock_send_ir_signal.assert_called_once_with(
             Commands.heat16,
             extra_info=['Forecast min temperature: None', 'Outside temperature: -19.5',
-                        'Target inside temperature: 12.2', 'Inside temperature: 1'])
+                        'Target inside temperature: 12.2', 'Inside temperature: 1', 'Current buffer: 0.0 h'])
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
