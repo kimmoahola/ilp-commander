@@ -113,6 +113,8 @@ class TestVer1:
             'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now()))
         mock_receive_ulkoilma_temperature = mocker.patch(
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(3), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(5), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(7), arrow.now()))
 
@@ -124,6 +126,7 @@ class TestVer1:
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_not_called()
+        mock_receive_open_weather_map_temperature.assert_not_called()
         mock_receive_fmi_temperature.assert_not_called()
 
     def test_auto_ver1_invalid_inside(self, mocker):
@@ -133,6 +136,8 @@ class TestVer1:
             'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now().shift(minutes=-60)))
         mock_receive_ulkoilma_temperature = mocker.patch(
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(3), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(7), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(7), arrow.now()))
 
@@ -141,10 +146,11 @@ class TestVer1:
         Auto.last_command = None
 
         mock_send_ir_signal.assert_called_once_with(
-            Commands.off, extra_info=['Inside temperature: None', 'Outside temperature: 5'])
+            Commands.off, extra_info=['Inside temperature: None', 'Outside temperature: 7'])
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
 
     def test_auto_ver1_invalid_all_temperatures(self, mocker):
@@ -154,6 +160,8 @@ class TestVer1:
             'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now().shift(minutes=-60)))
         mock_receive_ulkoilma_temperature = mocker.patch(
             'states.auto.receive_ulkoilma_temperature', return_value=(None, None))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(None, None))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(None, None))
 
@@ -167,6 +175,7 @@ class TestVer1:
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
 
     def test_auto_ver1_cold_inside(self, mocker):
@@ -176,6 +185,8 @@ class TestVer1:
             'states.auto.receive_wc_temperature', return_value=(Decimal('7.5'), arrow.now().shift(minutes=-30)))
         mock_receive_ulkoilma_temperature = mocker.patch(
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(3), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(5), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(7), arrow.now()))
 
@@ -188,6 +199,7 @@ class TestVer1:
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
 
     def test_auto_ver1_cold_inside_and_outside(self, mocker):
@@ -197,6 +209,8 @@ class TestVer1:
             'states.auto.receive_wc_temperature', return_value=(Decimal('7.5'), arrow.now().shift(minutes=-30)))
         mock_receive_ulkoilma_temperature = mocker.patch(
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(-3), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(-5), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(-7), arrow.now()))
 
@@ -209,6 +223,7 @@ class TestVer1:
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
 
     def test_auto_ver1_very_cold_inside_and_outside(self, mocker):
@@ -218,6 +233,8 @@ class TestVer1:
             'states.auto.receive_wc_temperature', return_value=(Decimal(1), arrow.now().shift(minutes=-30)))
         mock_receive_ulkoilma_temperature = mocker.patch(
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(-19), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(-20), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(-21), arrow.now()))
 
@@ -230,6 +247,7 @@ class TestVer1:
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
 
 
@@ -276,6 +294,8 @@ class TestVer2:
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(3), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(7), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(5), arrow.now()))
         mock_receive_yr_no_forecast_min_temperature = mocker.patch(
             'states.auto.receive_yr_no_forecast_min_temperature', return_value=(Decimal(1), None))
 
@@ -290,6 +310,7 @@ class TestVer2:
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()
 
     def test_auto_ver2_invalid_inside(self, mocker):
@@ -301,6 +322,8 @@ class TestVer2:
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(3), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(7), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(5), arrow.now()))
         mock_receive_yr_no_forecast_min_temperature = mocker.patch(
             'states.auto.receive_yr_no_forecast_min_temperature', return_value=(Decimal(1), arrow.now()))
 
@@ -316,6 +339,7 @@ class TestVer2:
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()
 
     def test_auto_ver2_invalid_inside_high_outside(self, mocker):
@@ -327,6 +351,8 @@ class TestVer2:
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(10), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(12), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(None, None))
         mock_receive_yr_no_forecast_min_temperature = mocker.patch(
             'states.auto.receive_yr_no_forecast_min_temperature', return_value=(Decimal(9), arrow.now()))
 
@@ -342,6 +368,7 @@ class TestVer2:
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()
 
     def test_auto_ver2_invalid_outside_high_forecast(self, mocker):
@@ -353,6 +380,8 @@ class TestVer2:
             'states.auto.receive_ulkoilma_temperature', return_value=(None, None))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(None, None))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(None, None))
         mock_receive_yr_no_forecast_min_temperature = mocker.patch(
             'states.auto.receive_yr_no_forecast_min_temperature', return_value=(Decimal(20), arrow.now()))
 
@@ -367,6 +396,7 @@ class TestVer2:
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()
 
     def test_auto_ver2_invalid_outside_low_forecast(self, mocker):
@@ -378,6 +408,8 @@ class TestVer2:
             'states.auto.receive_ulkoilma_temperature', return_value=(None, None))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(None, None))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(None, None))
         mock_receive_yr_no_forecast_min_temperature = mocker.patch(
             'states.auto.receive_yr_no_forecast_min_temperature', return_value=(Decimal(2), arrow.now()))
 
@@ -393,6 +425,7 @@ class TestVer2:
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()
 
     def test_auto_ver2_invalid_outside_and_inside_low_forecast(self, mocker):
@@ -404,6 +437,8 @@ class TestVer2:
             'states.auto.receive_ulkoilma_temperature', return_value=(None, None))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(None, None))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(None, None))
         mock_receive_yr_no_forecast_min_temperature = mocker.patch(
             'states.auto.receive_yr_no_forecast_min_temperature', return_value=(Decimal(2), arrow.now()))
 
@@ -419,6 +454,7 @@ class TestVer2:
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()
 
     def test_auto_ver2_invalid_all_temperatures(self, mocker):
@@ -430,6 +466,8 @@ class TestVer2:
             'states.auto.receive_ulkoilma_temperature', return_value=(None, None))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(None, None))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(None, None))
         mock_receive_yr_no_forecast_min_temperature = mocker.patch(
             'states.auto.receive_yr_no_forecast_min_temperature', return_value=(None, None))
 
@@ -445,6 +483,7 @@ class TestVer2:
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()
 
     def test_auto_ver2_cold_inside(self, mocker):
@@ -456,6 +495,8 @@ class TestVer2:
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(7), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(7), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(6), arrow.now()))
         mock_receive_yr_no_forecast_min_temperature = mocker.patch(
             'states.auto.receive_yr_no_forecast_min_temperature', return_value=(None, None))
 
@@ -471,6 +512,7 @@ class TestVer2:
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()
 
     def test_auto_ver2_cold_inside_and_outside(self, mocker):
@@ -482,6 +524,9 @@ class TestVer2:
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(-3), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(-7), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature',
+            return_value=(Decimal(-6), arrow.now().shift(minutes=-60)))
         mock_receive_yr_no_forecast_min_temperature = mocker.patch(
             'states.auto.receive_yr_no_forecast_min_temperature', return_value=(None, None))
 
@@ -497,6 +542,7 @@ class TestVer2:
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()
 
     def test_auto_ver2_very_cold_inside_and_outside(self, mocker):
@@ -508,6 +554,8 @@ class TestVer2:
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(-18), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(-21), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal('-19.5'), arrow.now()))
         mock_receive_yr_no_forecast_min_temperature = mocker.patch(
             'states.auto.receive_yr_no_forecast_min_temperature', return_value=(None, None))
 
@@ -523,6 +571,7 @@ class TestVer2:
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()
 
     def test_auto_ver2_warm_inside_and_outside(self, mocker):
@@ -534,6 +583,8 @@ class TestVer2:
             'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(15), arrow.now()))
         mock_receive_fmi_temperature = mocker.patch(
             'states.auto.receive_fmi_temperature', return_value=(Decimal(16), arrow.now()))
+        mock_receive_open_weather_map_temperature = mocker.patch(
+            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal('15.5'), arrow.now()))
         mock_receive_yr_no_forecast_min_temperature = mocker.patch(
             'states.auto.receive_yr_no_forecast_min_temperature', return_value=(None, None))
 
@@ -548,4 +599,5 @@ class TestVer2:
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
+        mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_yr_no_forecast_min_temperature.assert_called_once()

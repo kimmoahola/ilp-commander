@@ -115,6 +115,29 @@ def receive_fmi_temperature():
 
 
 @timing
+@caching(cache_name='open_weather_map')
+def receive_open_weather_map_temperature():
+    temp, ts = None, None
+
+    try:
+        result = requests.get(
+            'http://api.openweathermap.org/data/2.5/weather?q={place}&units=metric&appid={key}'.format(
+                key=config.OPEN_WEATHER_MAP_KEY, place=config.OPEN_WEATHER_MAP_LOCATION))
+    except Exception as e:
+        logger.exception(e)
+    else:
+        if result.status_code != 200:
+            logger.error('%d: %s' % (result.status_code, result.content))
+        else:
+            result_json = result.json()
+            temp = Decimal(result_json['main']['temp'])
+            ts = arrow.get(result_json['dt'])
+
+    logger.info('%s %s', temp, ts)
+    return temp, ts
+
+
+@timing
 @caching(cache_name='yr.no')
 def receive_yr_no_forecast_min_temperature(hours=None):
     temp, ts = None, None
@@ -244,7 +267,8 @@ class Auto(State):
 
         if inside_temp is None or inside_temp < 8:
 
-            outside_temp = Temperatures.get_temp([receive_ulkoilma_temperature, receive_fmi_temperature])[0]
+            outside_temp = Temperatures.get_temp([
+                receive_ulkoilma_temperature, receive_fmi_temperature, receive_open_weather_map_temperature])[0]
 
             extra_info.append('Outside temperature: %s' % outside_temp)
 
@@ -278,7 +302,8 @@ class Auto(State):
         allowed_min_inside_temp = Decimal(1)
         extra_info = ['Forecast min temperature: %s' % Auto.min_forecast_temp]
 
-        outside_temp = Temperatures.get_temp([receive_ulkoilma_temperature, receive_fmi_temperature])[0]
+        outside_temp = Temperatures.get_temp([
+            receive_ulkoilma_temperature, receive_fmi_temperature, receive_open_weather_map_temperature])[0]
         logger.info('Outside temperature: %s', outside_temp)
         extra_info.append('Outside temperature: %s' % outside_temp)
 
