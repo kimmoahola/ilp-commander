@@ -92,6 +92,14 @@ class TestGeneral:
             assert temp3 is None
             assert ts3 is None
 
+        RequestCache.reset()
+
+        with freeze_time('2017-08-20T15:00:00+00:00'):
+            assert datetime(2017, 8, 20, 15) == datetime.now()
+            temp4, ts4 = run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=24 * 60)
+            assert temp4 is None
+            assert ts4 is None
+
     def test_temperatures(self, mocker):
 
         if has_invalid_sheet():
