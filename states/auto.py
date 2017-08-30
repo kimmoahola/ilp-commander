@@ -177,11 +177,12 @@ def receive_yr_no_forecast_min_temperature(hours=None):
             logger.info('Min forecast temp: %s between %s and %s', temp, min_datetime, max_datetime)
     else:
         logger.info('Request failed. Getting result from cache.')
-        temp, ts = rq.get('yr.no', ignore_stale_check=True)
-
-        stale_after = ts.shift(hours=24)
-        if arrow.now() > stale_after:
-            temp, ts = None, None
+        result = rq.get('yr.no', ignore_stale_check=True)
+        if result:
+            ts_from_cache = result[1]
+            stale_after = ts_from_cache.shift(hours=24)
+            if arrow.now() <= stale_after:
+                temp, ts = result
 
     logger.info('%s %s', temp, ts)
     return temp, ts
