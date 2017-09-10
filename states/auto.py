@@ -106,9 +106,12 @@ def receive_fmi_temperature():
         if result.status_code != 200:
             logger.error('%d: %s' % (result.status_code, result.content))
         else:
-            temp_data = xmltodict.parse(result.content)['wfs:FeatureCollection']['wfs:member'][-1]['BsWfs:BsWfsElement']
-            ts = arrow.get(temp_data['BsWfs:Time']).to(config.TIMEZONE)
-            temp = Decimal(temp_data['BsWfs:ParameterValue'])
+            wfs_member = xmltodict.parse(result.content).get('wfs:FeatureCollection', {}).get('wfs:member')
+            if wfs_member:
+                temp_data = wfs_member[-1].get('BsWfs:BsWfsElement')
+                if temp_data and 'BsWfs:Time' in temp_data and 'BsWfs:ParameterValue' in temp_data:
+                    ts = arrow.get(temp_data['BsWfs:Time']).to(config.TIMEZONE)
+                    temp = Decimal(temp_data['BsWfs:ParameterValue'])
 
     logger.info('%s %s', temp, ts)
     return temp, ts
