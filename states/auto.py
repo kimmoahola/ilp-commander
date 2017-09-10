@@ -253,7 +253,10 @@ class Auto(State):
         if Auto.last_command is not None:
             logger.debug('Last auto command sent %d minutes ago', (time.time() - Auto.last_command_send_time) / 60.0)
 
-        if Auto.last_command != next_command:
+        # Send command every now and then even if command has not changed
+        force_send_command_time = 60 * 60 * 24 * 7  # 7 days
+
+        if Auto.last_command != next_command or time.time() - Auto.last_command_send_time > force_send_command_time:
             Auto.last_command = next_command
             Auto.last_command_send_time = time.time()
             send_ir_signal(next_command, extra_info=extra_info)
