@@ -334,7 +334,7 @@ class Auto(State):
 
         if inside_temp is not None and outside_temp is not None and inside_temp > outside_temp:
             inside_outside_diff = mean([inside_temp - outside_temp, allowed_min_inside_temp - outside_temp])
-            if inside_outside_diff > 0:
+            if inside_outside_diff != 0:
                 buffer = (inside_temp - allowed_min_inside_temp) / (
                     config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * inside_outside_diff)
                 if buffer >= 0:
