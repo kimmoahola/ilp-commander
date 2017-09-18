@@ -112,24 +112,39 @@ def send_ir_signal(command: str, extra_info: list = None):
         extra_info = []
 
     logger.info(command)
-    actually_send_ir_signal(command)
 
-    message = '\n'.join(extra_info)
+    if actually_send_ir_signal(command):
+        message = '\n'.join(extra_info)
 
-    email(
-        config.EMAIL_ADDRESSES,
-        'Send IR %s' % command,
-        'Send IR %s at %s\n%s' % (command, arrow.now().format('DD.MM.YYYY HH:mm'), message))
+        email(
+            config.EMAIL_ADDRESSES,
+            'Send IR',
+            'Send IR %s at %s\n%s' % (command, arrow.now().format('DD.MM.YYYY HH:mm'), message))
 
 
-def actually_send_ir_signal(command: str):
+def actually_send_ir_signal(command: str, retry_sending=True):
     try:
         p = Popen(['irsend', 'SEND_ONCE', 'ilp', command], stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output, err = p.communicate('')
-        if p.returncode != 0:
-            logger.error('%d: %s - %s', p.returncode, output, err)
+        if p.returncode == 0:
+            return True
+        else:
+            if retry_sending:
+                logger.warning('irsend: %d: %s - %s', p.returncode, output, err)
+                Popen(['sudo', 'service', 'lirc', 'restart'])
+                time.sleep(5)
+                return actually_send_ir_signal(command, False)
+            else:
+                logger.error('irsend: %d: %s - %s', p.returncode, output, err)
+                email(
+                    config.EMAIL_ADDRESSES,
+                    'Send IR',
+                    'Send IR %s at %s\n%s' % (command, arrow.now().format('DD.MM.YYYY HH:mm'),
+                                              'irsend: %d: %s - %s' % (p.returncode, output, err)))
+                return False
     except Exception as e:
         logger.exception(e)
+        return False
 
 
 def timing(f):
