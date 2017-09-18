@@ -1,4 +1,5 @@
 *.log
+*.log.*
 *.sqlite
 /config.py
 *.pyc
