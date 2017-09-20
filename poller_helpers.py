@@ -113,38 +113,36 @@ def send_ir_signal(command: str, extra_info: list = None):
 
     logger.info(command)
 
-    if actually_send_ir_signal(command):
-        message = '\n'.join(extra_info)
+    message = '\n'.join(extra_info)
 
-        email(
-            config.EMAIL_ADDRESSES,
-            'Send IR',
-            'Send IR %s at %s\n%s' % (command, arrow.now().format('DD.MM.YYYY HH:mm'), message))
+    try:
+        actually_send_ir_signal(command)
+    except IOError as e:
+        logger.exception(e)
+        message += '\nirsend: %s' % type(e).__name__
+
+    email(
+        config.EMAIL_ADDRESSES,
+        'Send IR',
+        'Send IR %s at %s\n%s' % (command, arrow.utcnow().to(config.TIMEZONE).format('DD.MM.YYYY HH:mm'), message))
 
 
-def actually_send_ir_signal(command: str, retry_sending=True):
+@retry(tries=2, delay=5)
+def actually_send_ir_signal(command: str):
     try:
         p = Popen(['irsend', 'SEND_ONCE', 'ilp', command], stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output, err = p.communicate('')
-        if p.returncode == 0:
-            return True
-        else:
-            if retry_sending:
-                logger.warning('irsend: %d: %s - %s', p.returncode, output, err)
-                Popen(['sudo', 'service', 'lirc', 'restart'])
-                time.sleep(5)
-                return actually_send_ir_signal(command, False)
-            else:
-                logger.error('irsend: %d: %s - %s', p.returncode, output, err)
-                email(
-                    config.EMAIL_ADDRESSES,
-                    'Send IR',
-                    'Send IR %s at %s\n%s' % (command, arrow.now().format('DD.MM.YYYY HH:mm'),
-                                              'irsend: %d: %s - %s' % (p.returncode, output, err)))
-                return False
+        if p.returncode != 0:
+            logger.warning('%d: %s - %s' % (p.returncode, output, err))
+            p_lirc_restart = Popen(['sudo', 'service', 'lirc', 'restart'])
+            output, err = p_lirc_restart.communicate('')
+            if p_lirc_restart.returncode != 0:
+                logger.error('lirc restart failed: %d: %s - %s' % (p_lirc_restart.returncode, output, err))
+            raise IOError()
+    except IOError:
+        raise
     except Exception as e:
         logger.exception(e)
-        return False
 
 
 def timing(f):
