@@ -45,8 +45,6 @@ class TestGeneral:
     def setup_method():
         RequestCache.reset()
 
-    @pytest.mark.skipif(has_invalid_sheet(),
-                        reason='No sheet OAuth file or key in config')
     def test_receive_ulkoilma_temperature(self):
         run_temp_test_for(receive_ulkoilma_temperature)
 
@@ -102,8 +100,7 @@ class TestGeneral:
 
     def test_temperatures(self, mocker):
 
-        if has_invalid_sheet():
-            mocker.patch('states.auto_test.receive_ulkoilma_temperature', return_value=(Decimal(3), arrow.now()))
+        mocker.patch('states.auto_test.receive_ulkoilma_temperature', return_value=(Decimal(3), arrow.now()))
 
         if has_invalid_fmi():
             mocker.patch('states.auto_test.receive_fmi_temperature', return_value=(Decimal(3), arrow.now()))
