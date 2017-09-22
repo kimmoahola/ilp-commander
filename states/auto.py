@@ -63,13 +63,34 @@ def caching(cache_name):
     return caching_inner
 
 
+def get_temp_from_temp_api(host_and_port, table_name):
+    temp, ts = None, None
+
+    try:
+        result = requests.get('http://{host_and_port}/latest?table={table_name}'.format(
+            host_and_port=host_and_port, table_name=table_name))
+    except Exception as e:
+        logger.exception(e)
+    else:
+        if result.status_code != 200:
+            logger.error('%d: %s' % (result.status_code, result.content))
+        else:
+            result_json = result.json()
+            if 'ts' in result_json and 'temperature' in result_json:
+                ts = result_json['ts']
+                temp = result_json['temperature']
+
+    return temp, ts
+
+
 @timing
 @caching(cache_name='ulkoilma')
 def receive_ulkoilma_temperature():
-    temp, ts = get_temp_from_sheet(sheet_index=2)
+    temp, ts = get_temp_from_temp_api(
+        config.TEMP_API_OUTSIDE.get('host_and_port'), config.TEMP_API_OUTSIDE.get('table_name'))
 
     if ts is not None and temp is not None:
-        ts = arrow.get(ts, 'DD.MM.YYYY klo HH:mm').replace(tzinfo=tz.gettz(config.TIMEZONE))
+        ts = arrow.get(ts).replace(tzinfo=tz.gettz(config.TIMEZONE))
         temp = Decimal(temp)
 
     logger.info('%s %s', temp, ts)
