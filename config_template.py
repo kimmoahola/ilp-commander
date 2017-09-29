@@ -15,11 +15,26 @@ EMAIL_ADDRESSES = []
 HEALTHCHECK_URL_CRON = ''
 HEALTHCHECK_URL_MESSAGE = ''
 CACHE_TIMES = {
-    'ulkoilma': 25,
-    'wc': 15,
-    'fmi': 15,
-    'yr.no': 60,
-    'open_weather_map': 60,
+    'ulkoilma': {
+        'if_ok': 25,
+        'if_failed': 120,
+    },
+    'wc': {
+        'if_ok': 15,
+        'if_failed': 120,
+    },
+    'fmi': {
+        'if_ok': 15,
+        'if_failed': 120,
+    },
+    'yr.no': {
+        'if_ok': 60,
+        'if_failed': 60 * 48,
+    },
+    'open_weather_map': {
+        'if_ok': 50,
+        'if_failed': 120,
+    },
 }
 MINIMUM_INSIDE_TEMP = Decimal(6)
 COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF = Decimal('0.018')

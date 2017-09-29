@@ -45,7 +45,8 @@ class TestGeneral:
     def setup_method():
         RequestCache.reset()
 
-    def test_receive_ulkoilma_temperature(self):
+    def test_receive_ulkoilma_temperature(self, mocker):
+        mocker.patch('states.auto.get_url')  # mock requests
         run_temp_test_for(receive_ulkoilma_temperature)
 
     @pytest.mark.skipif(has_invalid_sheet(),
@@ -64,7 +65,7 @@ class TestGeneral:
         run_temp_test_for(receive_open_weather_map_temperature)
 
     def test_receive_yr_no_forecast_min_temperature(self):
-        run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=24 * 60, hours=24)
+        run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=48 * 60)
 
     def test_receive_yr_no_forecast_min_temperature_cache(self, mocker):
         # Tests that after network is gone, we still get forecast for 24 hours
@@ -72,21 +73,22 @@ class TestGeneral:
         freeze_ts1 = arrow.get('2017-08-18T15:00:00+00:00')
         with freeze_time(freeze_ts1.datetime):
             assert datetime(2017, 8, 18, 15) == datetime.now()
-            temp1, ts1 = run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=24 * 60)
+            temp1, ts1 = run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=48 * 60)
             assert isinstance(ts1, arrow.Arrow)
 
-        mocker.patch('requests.get', return_value=None)
+        mocker.patch('requests.get', side_effect=Exception('foo'))
+        mock_time_sleep = mocker.patch('time.sleep')  # mock sleep so retry does not take a long time
 
-        with freeze_time('2017-08-19T14:59:00+00:00'):
-            assert datetime(2017, 8, 19, 14, 59) == datetime.now()
-            temp2, ts2 = run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=24 * 60)
+        with freeze_time('2017-08-20T14:59:00+00:00'):
+            assert datetime(2017, 8, 20, 14, 59) == datetime.now()
+            temp2, ts2 = run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=48 * 60)
             assert isinstance(ts2, arrow.Arrow)
 
         assert ts1 == ts2, 'two requests were made (mocking does not work?)'
 
-        with freeze_time('2017-08-19T15:00:00+00:00'):
-            assert datetime(2017, 8, 19, 15) == datetime.now()
-            temp3, ts3 = run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=24 * 60)
+        with freeze_time('2017-08-20T15:00:00+00:00'):
+            assert datetime(2017, 8, 20, 15) == datetime.now()
+            temp3, ts3 = run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=48 * 60)
             assert temp3 is None
             assert ts3 is None
 
@@ -94,9 +96,11 @@ class TestGeneral:
 
         with freeze_time('2017-08-20T15:00:00+00:00'):
             assert datetime(2017, 8, 20, 15) == datetime.now()
-            temp4, ts4 = run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=24 * 60)
+            temp4, ts4 = run_temp_test_for(receive_yr_no_forecast_min_temperature, max_ts_diff=48 * 60)
             assert temp4 is None
             assert ts4 is None
+
+        assert mock_time_sleep.call_count == 6
 
     def test_temperatures(self, mocker):
 
@@ -271,13 +275,15 @@ class TestVer2:
                         reason='No sheet OAuth file or key in config')
     def test_auto_ver2_message_wait(self, mocker):
         mocker.patch('states.auto.send_ir_signal')
-        mocker.patch('poller_helpers.get_url')  # mock health check
+        mock_healthcheck = mocker.patch('poller_helpers.get_url')  # mock health check
         mock_time_sleep = mocker.patch('time.sleep')
+        mocker.patch('states.auto.get_url')  # mock requests
 
         auto = Auto()
         payload = auto.run({}, version=2)
         Auto.last_command = None
 
+        mock_healthcheck.assert_called_once()
         mock_time_sleep.assert_called_once_with(60 * 10)
         assert payload == {}
 
@@ -288,13 +294,14 @@ class TestVer2:
         wks.update_cell(config.MESSAGE_SHEET_CELL, '{ "command":"auto", "param":null }')
 
         mocker.patch('states.auto.send_ir_signal')
-        mocker.patch('poller_helpers.get_url')  # mock health check
+        mock_healthcheck = mocker.patch('poller_helpers.get_url')  # mock health check
         mock_time_sleep = mocker.patch('time.sleep')
 
         auto = Auto()
         payload = auto.run({}, version=2)
         Auto.last_command = None
 
+        mock_healthcheck.assert_called_once()
         mock_time_sleep.assert_not_called()
         assert payload == {'command': 'auto', 'param': None}
         assert auto.nex(payload) == Auto

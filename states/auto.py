@@ -5,13 +5,12 @@ from functools import wraps
 from statistics import mean
 
 import arrow
-import requests
 import xmltodict
 from dateutil import tz
 
 import config
 from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_temp_from_sheet, \
-    median
+    median, get_url
 from states import State
 
 
@@ -19,20 +18,17 @@ class RequestCache:
     _cache = {}
 
     @classmethod
-    def put(cls, name, stale_after, content):
-        stale_after = max([stale_after, arrow.now().shift(minutes=10)])
-        cls._cache[name] = (stale_after, content)
+    def put(cls, name, stale_after_if_ok, stale_after_if_failed, content):
+        cls._cache[name] = (stale_after_if_ok, stale_after_if_failed, content)
 
     @classmethod
-    def get(cls, name, ignore_stale_check=False):
+    def get(cls, name, stale_check='ok'):
         if name in cls._cache:
-            content = cls._cache[name][1]
+            stale_after_if_ok, stale_after_if_failed, content = cls._cache[name]
 
-            if ignore_stale_check:
+            if stale_check == 'ok' and arrow.now() <= stale_after_if_ok:
                 return content
-
-            stale_after = cls._cache[name][0]
-            if arrow.now() <= stale_after:
+            elif stale_check == 'failed' and arrow.now() <= stale_after_if_failed:
                 return content
 
         return None
@@ -53,11 +49,20 @@ def caching(cache_name):
             else:
                 logger.debug('func:%r args:[%r, %r] cache miss' % (f.__name__, args, kw))
                 result = f(*args, **kw)
-                if result:
+                if result and result[1] is not None:  # result[1] == timestamp
                     temp, ts = result
-                    if ts is not None:
-                        logger.debug('func:%r args:[%r, %r] storing with result: %r' % (f.__name__, args, kw, result))
-                        rq.put(cache_name, ts.shift(minutes=config.CACHE_TIMES.get(cache_name, 60)), result)
+                    logger.debug('func:%r args:[%r, %r] storing with result: %r' % (f.__name__, args, kw, result))
+                    stale_after_if_ok = ts.shift(
+                        minutes=config.CACHE_TIMES.get(cache_name, {}).get('if_ok', 60))
+                    stale_after_if_failed = ts.shift(
+                        minutes=config.CACHE_TIMES.get(cache_name, {}).get('if_failed', 120))
+                    rq.put(cache_name, stale_after_if_ok, stale_after_if_failed, result)
+                else:
+                    result = rq.get(cache_name, stale_check='failed')
+                    if result:
+                        logger.debug('func:%r args:[%r, %r] returning old: %r' % (f.__name__, args, kw, result))
+                    else:
+                        logger.debug('func:%r args:[%r, %r] failed with cache miss' % (f.__name__, args, kw))
             return result
         return caching_wrap
     return caching_inner
@@ -67,7 +72,7 @@ def get_temp_from_temp_api(host_and_port, table_name):
     temp, ts = None, None
 
     try:
-        result = requests.get('http://{host_and_port}/latest?table={table_name}'.format(
+        result = get_url('http://{host_and_port}/latest?table={table_name}'.format(
             host_and_port=host_and_port, table_name=table_name))
     except Exception as e:
         logger.exception(e)
@@ -93,7 +98,7 @@ def receive_ulkoilma_temperature():
         ts = arrow.get(ts).replace(tzinfo=tz.gettz(config.TIMEZONE))
         temp = Decimal(temp)
 
-    logger.info('%s %s', temp, ts)
+    logger.info('temp:%s ts:%s', temp, ts)
     return temp, ts
 
 
@@ -106,7 +111,7 @@ def receive_wc_temperature():
         ts = arrow.get(ts, 'DD.MM.YYYY klo HH:mm').replace(tzinfo=tz.gettz(config.TIMEZONE))
         temp = Decimal(temp)
 
-    logger.info('%s %s', temp, ts)
+    logger.info('temp:%s ts:%s', temp, ts)
     return temp, ts
 
 
@@ -117,7 +122,7 @@ def receive_fmi_temperature():
 
     try:
         starttime = arrow.now().shift(hours=-1).to('UTC').format('YYYY-MM-DDTHH:mm:ss') + 'Z'
-        result = requests.get(
+        result = get_url(
             'http://data.fmi.fi/fmi-apikey/{key}/wfs?request=getFeature&storedquery_id=fmi::observations::weather'
             '::simple&place={place}&parameters=temperature&starttime={starttime}'.format(
                 key=config.FMI_KEY, place=config.FMI_LOCATION, starttime=starttime))
@@ -134,7 +139,7 @@ def receive_fmi_temperature():
                     ts = arrow.get(temp_data['BsWfs:Time']).to(config.TIMEZONE)
                     temp = Decimal(temp_data['BsWfs:ParameterValue'])
 
-    logger.info('%s %s', temp, ts)
+    logger.info('temp:%s ts:%s', temp, ts)
     return temp, ts
 
 
@@ -144,7 +149,7 @@ def receive_open_weather_map_temperature():
     temp, ts = None, None
 
     try:
-        result = requests.get(
+        result = get_url(
             'http://api.openweathermap.org/data/2.5/weather?q={place}&units=metric&appid={key}'.format(
                 key=config.OPEN_WEATHER_MAP_KEY, place=config.OPEN_WEATHER_MAP_LOCATION))
     except Exception as e:
@@ -157,40 +162,30 @@ def receive_open_weather_map_temperature():
             temp = Decimal(result_json['main']['temp'])
             ts = arrow.get(result_json['dt']).to(config.TIMEZONE)
 
-    logger.info('%s %s', temp, ts)
+    logger.info('temp:%s ts:%s', temp, ts)
     return temp, ts
 
 
 @timing
 @caching(cache_name='yr.no')
-def receive_yr_no_forecast_min_temperature(hours=None):
+def receive_yr_no_forecast_min_temperature():
     temp, ts = None, None
-    rq = RequestCache()
 
     try:
-        result = requests.get(
-            'http://www.yr.no/place/{place}/forecast_hour_by_hour.xml'.format(place=config.YR_NO_LOCATION))
+        result = get_url('http://www.yr.no/place/{place}/forecast_hour_by_hour.xml'.format(place=config.YR_NO_LOCATION))
     except Exception as e:
         logger.exception(e)
-        result = None
-
-    if result:
+    else:
         if result.status_code != 200:
             logger.error('%d: %s' % (result.status_code, result.content))
         else:
             d = xmltodict.parse(result.content)
             timezone = d['weatherdata']['location']['timezone']['@id']
 
-            if hours is None:
-                until_ts = None
-            else:
-                until_ts = arrow.now().shift(hours=hours)
-
             time_elements = [
                 t
                 for t
                 in d['weatherdata']['forecast']['tabular']['time']
-                if until_ts is None or arrow.get(t['@from']).replace(tzinfo=timezone) < until_ts
             ]
 
             temp = min(Decimal(t['temperature']['@value']) for t in time_elements)
@@ -199,16 +194,8 @@ def receive_yr_no_forecast_min_temperature(hours=None):
             ts = arrow.now()
 
             logger.info('Min forecast temp: %s between %s and %s', temp, min_datetime, max_datetime)
-    else:
-        logger.info('Request failed. Getting result from cache.')
-        result = rq.get('yr.no', ignore_stale_check=True)
-        if result:
-            ts_from_cache = result[1]
-            stale_after = ts_from_cache.shift(hours=24)
-            if arrow.now() <= stale_after:
-                temp, ts = result
 
-    logger.info('%s %s', temp, ts)
+    logger.info('temp:%s ts:%s', temp, ts)
     return temp, ts
 
 
@@ -230,16 +217,18 @@ class Temperatures:
         temperatures = []
 
         for func in functions:
-            temp, ts = func(**kwargs)
-            if temp is not None:
-                if ts is None:
-                    temperatures.append((temp, ts))
-                else:
-                    seconds = (arrow.now() - ts).total_seconds()
-                    if abs(seconds) < 60 * max_ts_diff:
+            result = func(**kwargs)
+            if result:
+                temp, ts = result
+                if temp is not None:
+                    if ts is None:
                         temperatures.append((temp, ts))
                     else:
-                        logger.info('Discarding temperature %s, temp: %s, temp time: %s', func_name(func), temp, ts)
+                        seconds = (arrow.now() - ts).total_seconds()
+                        if abs(seconds) < 60 * max_ts_diff:
+                            temperatures.append((temp, ts))
+                        else:
+                            logger.info('Discarding temperature %s, temp: %s, temp time: %s', func_name(func), temp, ts)
 
         return median(temperatures)
 
@@ -326,7 +315,7 @@ class Auto(State):
 
     @staticmethod
     def version_2():
-        Auto.min_forecast_temp = Temperatures.get_temp([receive_yr_no_forecast_min_temperature], hours=24)[0]
+        Auto.min_forecast_temp = Temperatures.get_temp([receive_yr_no_forecast_min_temperature], max_ts_diff=48 * 60)[0]
         allowed_min_inside_temp = Decimal(1)
         extra_info = ['Forecast min temperature: %s' % Auto.min_forecast_temp]
 
