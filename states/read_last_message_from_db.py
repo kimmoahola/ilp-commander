@@ -14,10 +14,9 @@ class ReadLastMessageFromDB(State):
                 return {}
 
     def nex(self, payload):
-        from states.auto import Auto
-        from states.wait_message_manual import WaitMessageManual
-
         if payload and payload['command'] == 'auto':
+            from states.auto import Auto
             return Auto
         else:
-            return WaitMessageManual
+            from states.manual import Manual
+            return Manual
