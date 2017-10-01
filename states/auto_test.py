@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from decimal import Decimal
 
@@ -40,6 +41,17 @@ def has_invalid_open_weather_map():
     return not config.OPEN_WEATHER_MAP_KEY or not config.OPEN_WEATHER_MAP_LOCATION
 
 
+class FakeResponse:
+    status_code = 200
+    content = ''
+
+    def __init__(self, content):
+        self.content = content
+
+    def json(self):
+        return json.loads(self.content)
+
+
 class TestGeneral:
     @staticmethod
     def setup_method():
@@ -48,6 +60,13 @@ class TestGeneral:
     def test_receive_ulkoilma_temperature(self, mocker):
         mocker.patch('states.auto.get_url')  # mock requests
         run_temp_test_for(receive_ulkoilma_temperature)
+
+    def test_receive_ulkoilma_temperature_2(self, mocker):
+        mocker.patch('states.auto.get_url',
+                     return_value=FakeResponse('{"id":118143,"ts":"2017-10-01T16:20:26+00:00","temperature":"8.187"}'))
+        temp, ts = receive_ulkoilma_temperature()
+        assert temp == Decimal('8.187')
+        assert ts == arrow.get('"2017-10-01T16:20:26+00:00')
 
     @pytest.mark.skipif(has_invalid_sheet(),
                         reason='No sheet OAuth file or key in config')
