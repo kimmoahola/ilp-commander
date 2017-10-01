@@ -96,7 +96,7 @@ def receive_ulkoilma_temperature():
         config.TEMP_API_OUTSIDE.get('host_and_port'), config.TEMP_API_OUTSIDE.get('table_name'))
 
     if ts is not None and temp is not None:
-        ts = arrow.get(ts).to(tzinfo=tz.gettz(config.TIMEZONE))
+        ts = arrow.get(ts).to(config.TIMEZONE)
         temp = Decimal(temp)
 
     logger.info('temp:%s ts:%s', temp, ts)
