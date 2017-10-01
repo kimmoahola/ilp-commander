@@ -60,9 +60,10 @@ def caching(cache_name):
                 else:
                     result = rq.get(cache_name, stale_check='failed')
                     if result:
-                        logger.debug('func:%r args:[%r, %r] returning old: %r' % (f.__name__, args, kw, result))
+                        logger.debug('func:%r args:[%r, %r] failed and returning old result: %r' % (
+                            f.__name__, args, kw, result))
                     else:
-                        logger.debug('func:%r args:[%r, %r] failed with cache miss' % (f.__name__, args, kw))
+                        logger.debug('func:%r args:[%r, %r] failed and no result in cache' % (f.__name__, args, kw))
             return result
         return caching_wrap
     return caching_inner
@@ -95,7 +96,7 @@ def receive_ulkoilma_temperature():
         config.TEMP_API_OUTSIDE.get('host_and_port'), config.TEMP_API_OUTSIDE.get('table_name'))
 
     if ts is not None and temp is not None:
-        ts = arrow.get(ts).replace(tzinfo=tz.gettz(config.TIMEZONE))
+        ts = arrow.get(ts).to(tzinfo=tz.gettz(config.TIMEZONE))
         temp = Decimal(temp)
 
     logger.info('temp:%s ts:%s', temp, ts)
