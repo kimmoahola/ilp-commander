@@ -1,16 +1,16 @@
 # Install
 
-Automatic installation script assumes that this is cloned to `/home/pi/ilp-commander/` and that there's a user `pi` at `/home/pi`
+- Automatic installation script assumes that this is cloned to `/home/pi/ilp-commander/` and that there's a user `pi` at `/home/pi`
 
-Install pyenv
+- Install pyenv
 
-Install correct python version: `pyenv install --skip-existing`
+- `cd /home/pi && git clone https://github.com/termopetteri/ilp-commander.git`
 
-`git clone https://github.com/termopetteri/ilp-commander.git`
+- `cd ilp-commander`
 
-`cd ilp-commander`
+- Install correct python version: `pyenv install --skip-existing`
 
-`sudo sh install_or_update.sh`
+- `sudo sh install_or_update.sh`
 
 # Tests
 
