@@ -169,7 +169,7 @@ def receive_open_weather_map_temperature():
 
 @timing
 @caching(cache_name='yr.no')
-def receive_yr_no_forecast_min_temperature():
+def receive_yr_no_forecast():
     temp, ts = None, None
 
     try:
@@ -183,21 +183,28 @@ def receive_yr_no_forecast_min_temperature():
             d = xmltodict.parse(result.content)
             timezone = d['weatherdata']['location']['timezone']['@id']
 
-            time_elements = [
-                t
+            temp = [
+                (Decimal(t['temperature']['@value']), arrow.get(t['@from']).replace(tzinfo=timezone))
                 for t
                 in d['weatherdata']['forecast']['tabular']['time']
             ]
 
-            temp = min(Decimal(t['temperature']['@value']) for t in time_elements)
-            min_datetime = arrow.get(min(t['@from'] for t in time_elements)).replace(tzinfo=timezone)
-            max_datetime = arrow.get(max(t['@to'] for t in time_elements)).replace(tzinfo=timezone)
+            # temp = min(Decimal(t['temperature']['@value']) for t in time_elements)
+            # min_datetime = arrow.get(min(t['@from'] for t in time_elements)).replace(tzinfo=timezone)
+            # max_datetime = arrow.get(max(t['@to'] for t in time_elements)).replace(tzinfo=timezone)
             ts = arrow.now()
 
-            logger.info('Min forecast temp: %s between %s and %s', temp, min_datetime, max_datetime)
+            logger.info('Forecast: %s', temp)
 
     logger.info('temp:%s ts:%s', temp, ts)
     return temp, ts
+
+
+def receive_yr_no_forecast_min_temperature(forecast):
+    if forecast and forecast[0]:
+        return min(t[0] for t in forecast[0])
+    else:
+        return None
 
 
 def func_name(func):
@@ -234,20 +241,127 @@ class Temperatures:
         return median(temperatures)
 
 
-def target_inside_temperature(outside_temp: Decimal, allowed_min_inside_temp: Decimal):
+def target_inside_temperature(outside_temp: Decimal, allowed_min_inside_temp: Decimal, forecast: list) -> Decimal:
 
-    def foo(result: Decimal, count: int) -> Decimal:
-        if count > 0:
-            inside_outside_diff = mean([result - outside_temp, allowed_min_inside_temp - outside_temp])
-            new_result = \
-                config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF \
-                * inside_outside_diff \
-                * config.COOLING_TIME_BUFFER \
-                + allowed_min_inside_temp
-            return foo(new_result, count - 1)
-        return result
+    from pprint import pprint
 
-    return max(foo(allowed_min_inside_temp, 3), config.MINIMUM_INSIDE_TEMP)
+    # pprint(forecast)
+
+    if forecast and forecast[0]:
+        reversed_forecast = [f[0] for f in reversed(forecast[0])]
+    else:
+        reversed_forecast = []
+
+    reversed_forecast += [outside_temp]
+
+    temps_after_forecast = [mean(t for t in reversed_forecast)] * (config.COOLING_TIME_BUFFER - len(reversed_forecast))
+    # temps_after_forecast = []
+
+    reversed_forecast = temps_after_forecast + reversed_forecast
+
+    # pprint(reversed_forecast)
+
+    iteration_inside_temp = allowed_min_inside_temp
+
+    for current_outside_temp in reversed_forecast:
+
+        outside_inside_diff = current_outside_temp - iteration_inside_temp
+        temp_drop = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * outside_inside_diff
+        iteration_inside_temp -= temp_drop
+
+    #     pprint({
+    #         # 'outside_inside_diff': outside_inside_diff,
+    #         'current_outside_temp': current_outside_temp,
+    #         'temp_drop': temp_drop,
+    #         'iteration_inside_temp': iteration_inside_temp,
+    #     })
+    #
+    # print('iteration_inside_temp', iteration_inside_temp)
+    # print('len(reversed_forecast)', len(reversed_forecast))
+
+    return max(iteration_inside_temp, config.MINIMUM_INSIDE_TEMP)
+
+
+def get_buffer(inside_temp: Decimal, outside_temp: Decimal, allowed_min_inside_temp: Decimal,
+               forecast: list) -> (Decimal, Decimal):
+    buffer = None  # hours
+
+    if forecast:
+        forecast = forecast[0]  # remove fetch timestamp
+        if forecast:
+            forecast = [(outside_temp, None)] + forecast
+
+    iteration_inside_temp = inside_temp
+
+    foof = False
+
+    iteration = 0
+    while True:
+
+        have_forecast_left = False
+
+        if forecast and len(forecast) >= iteration + 1:
+            have_forecast_left = True
+            current_outside_temp = forecast[iteration][0]
+        elif forecast:
+            current_outside_temp = mean(t[0] for t in forecast)
+        else:
+            current_outside_temp = outside_temp
+
+        iteration += 1
+
+        inside_outside_diff = iteration_inside_temp - current_outside_temp
+        temp_drop = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * inside_outside_diff
+
+        from pprint import pprint
+        if temp_drop > 0 or have_forecast_left:
+            if buffer is None:
+                buffer = Decimal(0)
+
+            # if iteration_inside_temp > allowed_min_inside_temp:
+
+            # temp still dropping
+
+            if temp_drop < Decimal('0.0001') and current_outside_temp > allowed_min_inside_temp and not have_forecast_left:
+                buffer = None
+                break
+
+            if iteration_inside_temp - temp_drop >= allowed_min_inside_temp:
+                iteration_inside_temp -= temp_drop
+                # if buffer is None:
+                #     buffer = Decimal(0)
+                buffer += 1
+                # if buffer > 100:
+                #     raise SystemError()
+                # pprint({
+                #     'have_forecast_left': have_forecast_left,
+                #     'current_outside_temp': current_outside_temp,
+                #     'temp_drop': temp_drop,
+                #     'iteration_inside_temp': iteration_inside_temp,
+                # })
+                continue
+            else:
+                foof = True
+                # pprint(locals())
+
+            # buffer -= 1
+        # else:
+        break
+
+    if buffer is None or not foof and iteration_inside_temp >= allowed_min_inside_temp:
+    # if iteration_inside_temp > allowed_min_inside_temp or buffer is None:
+        buffer = 'inf'
+
+    if isinstance(buffer, Decimal):
+        buffer = buffer.quantize(Decimal('.1'))
+
+    # pprint({
+    #     'have_forecast_left': have_forecast_left,
+    #     'current_outside_temp': current_outside_temp,
+    #     'temp_drop': temp_drop,
+    #     'iteration_inside_temp': iteration_inside_temp,
+    # })
+    return buffer
 
 
 class Auto(State):
@@ -316,8 +430,10 @@ class Auto(State):
 
     @staticmethod
     def version_2():
-        Auto.min_forecast_temp = Temperatures.get_temp([receive_yr_no_forecast_min_temperature], max_ts_diff=48 * 60)[0]
+        forecast = Temperatures.get_temp([receive_yr_no_forecast], max_ts_diff=48 * 60)
+        Auto.min_forecast_temp = receive_yr_no_forecast_min_temperature(forecast)
         allowed_min_inside_temp = Decimal(1)
+        print(Auto.min_forecast_temp)
         extra_info = ['Forecast min temperature: %s' % Auto.min_forecast_temp]
 
         outside_temp = Temperatures.get_temp([
@@ -335,7 +451,7 @@ class Auto(State):
                 logger.info('Using predefined outside temperature: %s', outside_temp)
                 extra_info.append('Using predefined outside temperature: %s' % outside_temp)
 
-        target_inside_temp = target_inside_temperature(outside_temp, allowed_min_inside_temp)
+        target_inside_temp = target_inside_temperature(outside_temp, allowed_min_inside_temp, forecast)
         logger.info('Target inside temperature: %s', target_inside_temp)
         extra_info.append('Target inside temperature: %s' % target_inside_temp.quantize(Decimal('.1')))
 
@@ -343,15 +459,11 @@ class Auto(State):
         logger.info('Inside temperature: %s', inside_temp)
         extra_info.append('Inside temperature: %s' % inside_temp)
 
-        if inside_temp is not None and outside_temp is not None and inside_temp > outside_temp:
-            inside_outside_diff = mean([inside_temp - outside_temp, allowed_min_inside_temp - outside_temp])
-            if inside_outside_diff != 0:
-                buffer = (inside_temp - allowed_min_inside_temp) / (
-                    config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * inside_outside_diff)
-                if buffer >= 0:
-                    buffer = buffer.quantize(Decimal('.1'))
-                    logger.info('Current buffer: %s h', buffer)
-                    extra_info.append('Current buffer: %s h' % buffer)
+        if inside_temp is not None and outside_temp is not None:
+            buffer = get_buffer(inside_temp, outside_temp, allowed_min_inside_temp, forecast)
+            if buffer is not None:
+                logger.info('Current buffer: %s h', buffer)
+                extra_info.append('Current buffer: %s h' % buffer)
 
         if inside_temp is not None:
             if outside_temp < target_inside_temp and inside_temp < target_inside_temp:
