@@ -20,6 +20,10 @@ Run: `py.test`
 
 `py.test -s .\states\auto_test.py::TestVer2::test_auto_ver2_warm_inside_and_outside`
 
+## Run matching tests and print output
+
+`py.test -s -k buffer`
+
 # Tips for development
 
 ## Get raw timings from IR sensor
