@@ -10,7 +10,7 @@ from dateutil import tz
 
 import config
 from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_temp_from_sheet, \
-    median, get_url
+    median, get_url, time_str
 from states import State
 
 
@@ -133,12 +133,14 @@ def receive_fmi_temperature():
         if result.status_code != 200:
             logger.error('%d: %s' % (result.status_code, result.content))
         else:
-            wfs_member = xmltodict.parse(result.content).get('wfs:FeatureCollection', {}).get('wfs:member')
-            if wfs_member:
+            try:
+                wfs_member = xmltodict.parse(result.content).get('wfs:FeatureCollection', {}).get('wfs:member')
                 temp_data = wfs_member[-1].get('BsWfs:BsWfsElement')
                 if temp_data and 'BsWfs:Time' in temp_data and 'BsWfs:ParameterValue' in temp_data:
                     ts = arrow.get(temp_data['BsWfs:Time']).to(config.TIMEZONE)
                     temp = Decimal(temp_data['BsWfs:ParameterValue'])
+            except KeyError:
+                temp, ts = None, None
 
     logger.info('temp:%s ts:%s', temp, ts)
     return temp, ts
@@ -243,7 +245,7 @@ class Temperatures:
 
 def target_inside_temperature(outside_temp: Decimal, allowed_min_inside_temp: Decimal, forecast: list) -> Decimal:
 
-    from pprint import pprint
+    # from pprint import pprint
 
     # pprint(forecast)
 
@@ -313,7 +315,7 @@ def get_buffer(inside_temp: Decimal, outside_temp: Decimal, allowed_min_inside_t
         inside_outside_diff = iteration_inside_temp - current_outside_temp
         temp_drop = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * inside_outside_diff
 
-        from pprint import pprint
+        # from pprint import pprint
         if temp_drop > 0 or have_forecast_left:
             if buffer is None:
                 buffer = Decimal(0)
@@ -382,7 +384,8 @@ class Auto(State):
             logger.debug('Last auto command sent %d minutes ago', (time.time() - Auto.last_command_send_time) / 60.0)
 
         # Send command every now and then even if command has not changed
-        force_send_command_time = 60 * 60 * 24 * 7  # 7 days
+        force_send_command_time = 60 * 60 * 8
+        # force_send_command_time = 60 * 60 * 24 * 7  # 7 days
 
         if Auto.last_command != next_command or time.time() - Auto.last_command_send_time > force_send_command_time:
             Auto.last_command = next_command
@@ -433,8 +436,12 @@ class Auto(State):
         forecast = Temperatures.get_temp([receive_yr_no_forecast], max_ts_diff=48 * 60)
         Auto.min_forecast_temp = receive_yr_no_forecast_min_temperature(forecast)
         allowed_min_inside_temp = Decimal(1)
-        print(Auto.min_forecast_temp)
         extra_info = ['Forecast min temperature: %s' % Auto.min_forecast_temp]
+
+        if forecast and forecast[0]:
+            mean_forecast = mean(f[0] for f in forecast[0]).quantize(Decimal('.1'))
+            logger.info('Forecast mean: %s', mean_forecast)
+            extra_info.append('Forecast mean: %s' % mean_forecast)
 
         outside_temp = Temperatures.get_temp([
             receive_ulkoilma_temperature, receive_fmi_temperature, receive_open_weather_map_temperature])[0]
@@ -462,8 +469,21 @@ class Auto(State):
         if inside_temp is not None and outside_temp is not None:
             buffer = get_buffer(inside_temp, outside_temp, allowed_min_inside_temp, forecast)
             if buffer is not None:
-                logger.info('Current buffer: %s h', buffer)
-                extra_info.append('Current buffer: %s h' % buffer)
+                if isinstance(buffer, (int, Decimal)):
+                    ts = time_str(arrow.utcnow().shift(hours=float(buffer)))
+                else:
+                    ts = ''
+                logger.info('Current buffer: %s h (%s) to %s', buffer, ts, allowed_min_inside_temp)
+                extra_info.append('Current buffer: %s h (%s) to %s' % (buffer, ts, allowed_min_inside_temp))
+
+            time_until_heat = get_buffer(inside_temp, outside_temp, target_inside_temp, forecast)
+            if time_until_heat is not None:
+                if isinstance(time_until_heat, (int, Decimal)):
+                    ts = time_str(arrow.utcnow().shift(hours=float(time_until_heat)))
+                else:
+                    ts = ''
+                logger.info('Current time_until_heat: %s h (%s) to %s', time_until_heat, ts, target_inside_temp)
+                extra_info.append('Current time_until_heat: %s h (%s) to %s' % (time_until_heat, ts, target_inside_temp))
 
         if inside_temp is not None:
             if outside_temp < target_inside_temp and inside_temp < target_inside_temp:
