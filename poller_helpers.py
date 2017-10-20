@@ -124,7 +124,16 @@ def send_ir_signal(command: str, extra_info: list = None):
     email(
         config.EMAIL_ADDRESSES,
         'Send IR',
-        'Send IR %s at %s\n%s' % (command, arrow.utcnow().to(config.TIMEZONE).format('DD.MM.YYYY HH:mm'), message))
+        'Send IR %s at %s\n%s' % (command, time_str(), message))
+
+
+def time_str(from_str=None):
+    if from_str:
+        a = arrow.get(from_str)
+    else:
+        a = arrow.utcnow()
+
+    return a.to(config.TIMEZONE).format('DD.MM.YYYY HH:mm')
 
 
 @retry(tries=2, delay=5)
