@@ -258,6 +258,24 @@ def get_message_from_sheet():
 
 
 @timing
+def write_log_to_sheet(next_command, extra_info):
+    sh = InitPygsheets.init_pygsheets()
+    cell = 'B1'
+
+    msg = '\n'.join([next_command] + extra_info)
+
+    if sh:
+        try:
+            wks = sh[config.MESSAGE_SHEET_INDEX]
+            wks.update_cell(cell, msg)
+        except (pygsheets.exceptions.RequestError, ConnectionError):
+            pass
+        except Exception as e:
+            logger.exception(e)
+            InitPygsheets.reset_pygsheets()
+
+
+@timing
 def get_temp_from_sheet(sheet_index):
     sh = InitPygsheets.init_pygsheets()
 

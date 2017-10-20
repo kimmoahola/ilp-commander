@@ -10,7 +10,7 @@ from dateutil import tz
 
 import config
 from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_temp_from_sheet, \
-    median, get_url, time_str
+    median, get_url, time_str, write_log_to_sheet
 from states import State
 
 
@@ -391,6 +391,8 @@ class Auto(State):
             Auto.last_command = next_command
             Auto.last_command_send_time = time.time()
             send_ir_signal(next_command, extra_info=extra_info)
+
+        write_log_to_sheet(next_command, extra_info=extra_info)
 
         return get_most_recent_message(once=True)
 
