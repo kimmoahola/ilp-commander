@@ -7,6 +7,7 @@ from decimal import Decimal
 from email.mime.text import MIMEText
 from functools import wraps
 from subprocess import Popen, PIPE
+from typing import NamedTuple, List
 
 import arrow
 import pygsheets
@@ -23,6 +24,11 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 logger.info('----- START -----')
+
+
+# TempTs = Tuple[Decimal, arrow.Arrow]
+TempTs = NamedTuple("TempTs", [('temp', Decimal), ('ts', arrow.Arrow)])
+Forecast = NamedTuple("Forecast", [('temps', List[TempTs]), ('ts', arrow.Arrow)])
 
 
 class Commands:
@@ -262,7 +268,7 @@ def write_log_to_sheet(next_command, extra_info):
     sh = InitPygsheets.init_pygsheets()
     cell = 'B1'
 
-    msg = '\n'.join([next_command] + extra_info)
+    msg = '\n'.join([next_command, time_str()] + extra_info)
 
     if sh:
         try:
