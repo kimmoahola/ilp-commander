@@ -279,6 +279,7 @@ def target_inside_temperature(outside_temp_ts: TempTs, allowed_min_inside_temp: 
     # print('outside_after_forecast', outside_after_forecast)
     while iteration_ts > reversed_forecast[0].ts:
         hours_to_forecast_start = Decimal((iteration_ts - reversed_forecast[0].ts).total_seconds() / 3600.0)
+        assert hours_to_forecast_start >= 0, hours_to_forecast_start
         this_iteration_hours = min([Decimal(1), hours_to_forecast_start])
         outside_inside_diff = outside_after_forecast - iteration_inside_temp
         temp_drop = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * outside_inside_diff * this_iteration_hours
@@ -299,8 +300,9 @@ def target_inside_temperature(outside_temp_ts: TempTs, allowed_min_inside_temp: 
 
     # print('-' * 10, 'start forecast', iteration_ts, iteration_inside_temp)
 
-    for fc in reversed_forecast:
+    for fc in filter(lambda x: x.ts <= iteration_ts, reversed_forecast):
         this_iteration_hours = Decimal((iteration_ts - fc.ts).total_seconds() / 3600.0)
+        assert this_iteration_hours >= 0, this_iteration_hours
         outside_inside_diff = fc.temp - iteration_inside_temp
         temp_drop = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * outside_inside_diff * this_iteration_hours
         # if iteration_inside_temp - temp_drop > allowed_min_inside_temp:
@@ -500,10 +502,10 @@ class Auto(State):
         allowed_min_inside_temp = Decimal(1)
         extra_info = ['Forecast min temperature: %s' % Auto.min_forecast_temp]
 
-        # if forecast and forecast.temps:
-        #     mean_forecast = mean(f.temp for f in forecast.temps).quantize(Decimal('.1'))
-        #     logger.info('Forecast mean: %s', mean_forecast)
-        #     extra_info.append('Forecast mean: %s' % mean_forecast)
+        if forecast and forecast.temps:
+            mean_forecast = mean(f.temp for f in forecast.temps).quantize(Decimal('.1'))
+            logger.info('Forecast mean: %s', mean_forecast)
+            extra_info.append('Forecast mean: %s' % mean_forecast)
 
         outside_temp, outside_ts = Temperatures.get_temp([
             receive_ulkoilma_temperature, receive_fmi_temperature, receive_open_weather_map_temperature])
@@ -537,7 +539,7 @@ class Auto(State):
                     ts = time_str(arrow.utcnow().shift(hours=float(buffer)))
                 else:
                     ts = ''
-                logger.info('Current buffer: %s h (%s) temp %s C', buffer, ts, allowed_min_inside_temp)
+                logger.info('Current buffer: %s h (%s) to temp %s C', buffer, ts, allowed_min_inside_temp)
                 extra_info.append('Current buffer: %s h (%s) to temp %s C' % (buffer, ts, allowed_min_inside_temp))
 
         if inside_temp is not None:
@@ -558,8 +560,8 @@ class Auto(State):
                     ts = time_str(arrow.utcnow().shift(hours=float(time_until_heat)))
                 else:
                     ts = ''
-                logger.info('Current time_until_heat: %s h (%s) temp %s C', time_until_heat, ts, target_inside_temp)
-                extra_info.append('Current time_until_heat: %s h (%s) temp %s C' % (time_until_heat, ts, target_inside_temp))
+                logger.info('Current time_until_heat: %s h (%s) to temp %s C', time_until_heat, ts, target_inside_temp)
+                extra_info.append('Current time_until_heat: %s h (%s) to temp %s C' % (time_until_heat, ts, target_inside_temp))
 
         return next_command, extra_info
 
