@@ -244,7 +244,7 @@ class Temperatures:
         return median(temperatures)
 
 
-def target_inside_temperature(outside_temp_ts: TempTs, allowed_min_inside_temp: Decimal, forecast: Forecast) -> Decimal:
+def target_inside_temperature(outside_temp_ts: TempTs, allowed_min_inside_temp: Decimal, forecast: Forecast, cooling_time_buffer=config.COOLING_TIME_BUFFER) -> Decimal:
     # print('target_inside_temperature', '-' * 50)
 
     # from pprint import pprint
@@ -271,7 +271,7 @@ def target_inside_temperature(outside_temp_ts: TempTs, allowed_min_inside_temp: 
     # pprint(reversed_forecast[-1].ts)
 
     iteration_inside_temp = allowed_min_inside_temp
-    iteration_ts = arrow.now().shift(hours=float(config.COOLING_TIME_BUFFER))
+    iteration_ts = arrow.now().shift(hours=float(cooling_time_buffer))
     # print('iteration_ts', iteration_ts)
 
     # if reversed_forecast[0].ts < iteration_ts:
@@ -433,7 +433,7 @@ class Auto(State):
         if version == 1:
             next_command, extra_info = self.version_1()
         elif version == 2:
-            next_command, extra_info = self.version_2()
+            next_command, extra_info = self.version_2(Auto.last_command)
         else:
             raise ValueError(version)
 
@@ -491,7 +491,7 @@ class Auto(State):
         return next_command, extra_info
 
     @staticmethod
-    def version_2():
+    def version_2(last_command):
         f_temps, f_ts = Temperatures.get_temp([receive_yr_no_forecast], max_ts_diff=48 * 60)
         if f_temps and f_ts:
             forecast = Forecast(temps=[TempTs(temp, ts) for temp, ts in f_temps], ts=f_ts)
@@ -525,7 +525,6 @@ class Auto(State):
 
         target_inside_temp = target_inside_temperature(TempTs(temp=outside_temp, ts=outside_ts), allowed_min_inside_temp, forecast)
         logger.info('Target inside temperature: %s', target_inside_temp)
-        # extra_info.append('Target inside temperature: %s' % target_inside_temp)
         extra_info.append('Target inside temperature: %s' % target_inside_temp.quantize(Decimal('.1')))
 
         inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
@@ -541,6 +540,18 @@ class Auto(State):
                     ts = ''
                 logger.info('Current buffer: %s h (%s) to temp %s C', buffer, ts, allowed_min_inside_temp)
                 extra_info.append('Current buffer: %s h (%s) to temp %s C' % (buffer, ts, allowed_min_inside_temp))
+
+        target_inside_temp_hysteresis_high = target_inside_temperature(
+            TempTs(temp=outside_temp, ts=outside_ts), target_inside_temp, forecast, Decimal(6))
+        target_inside_temp_hysteresis_low = target_inside_temp
+
+        if last_command and 'heat' in last_command:
+            target_inside_temp = target_inside_temp_hysteresis_high
+        else:
+            target_inside_temp = target_inside_temp_hysteresis_low
+
+        logger.info('Hysteresis: %s', target_inside_temp_hysteresis_high)
+        extra_info.append('Hysteresis: %s' % target_inside_temp_hysteresis_high.quantize(Decimal('.1')))
 
         if inside_temp is not None:
             if outside_temp < target_inside_temp and inside_temp < target_inside_temp:
@@ -561,7 +572,7 @@ class Auto(State):
                 else:
                     ts = ''
                 logger.info('Current time_until_heat: %s h (%s) to temp %s C', time_until_heat, ts, target_inside_temp)
-                extra_info.append('Current time_until_heat: %s h (%s) to temp %s C' % (time_until_heat, ts, target_inside_temp))
+                extra_info.append('Current time_until_heat: %s h (%s) to temp %s C' % (time_until_heat, ts, target_inside_temp.quantize(Decimal('.1'))))
 
         return next_command, extra_info
 

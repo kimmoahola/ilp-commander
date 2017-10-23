@@ -385,7 +385,7 @@ class TestVer2:
                 Commands.off, extra_info=['Forecast min temperature: 1', 'Outside temperature: 5',
                                           'Target inside temperature: 6.0', 'Inside temperature: 8',
                                           'Current buffer: inf h () to temp 1 C',
-                                          'Current time_until_heat: 28.0 h (23.10.2017 12:00) temp 6 C'])
+                                          'Current time_until_heat: 28.0 h (23.10.2017 12:00) to temp 6 C'])
             mock_get_most_recent_message.assert_called_once_with(once=True)
             mock_receive_wc_temperature.assert_called_once()
             mock_receive_ulkoilma_temperature.assert_called_once()
@@ -473,7 +473,7 @@ class TestVer2:
             Commands.off, extra_info=['Forecast min temperature: 20', 'Outside temperature: None',
                                       'Using forecast: 20', 'Target inside temperature: 6.0', 'Inside temperature: 8',
                                       'Current buffer: inf h () to temp 1 C',
-                                      'Current time_until_heat: inf h () temp 6 C'])
+                                      'Current time_until_heat: inf h () to temp 6 C'])
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
@@ -505,7 +505,7 @@ class TestVer2:
                 extra_info=['Forecast min temperature: 2', 'Outside temperature: None', 'Using forecast: 2',
                             'Target inside temperature: 6.0', 'Inside temperature: 8',
                             'Current buffer: inf h () to temp 1 C',
-                            'Current time_until_heat: 23.9 h (23.10.2017 07:54) temp 6 C'])
+                            'Current time_until_heat: 23.9 h (23.10.2017 07:54) to temp 6 C'])
             mock_get_most_recent_message.assert_called_once_with(once=True)
             mock_receive_wc_temperature.assert_called_once()
             mock_receive_ulkoilma_temperature.assert_called_once()
@@ -593,7 +593,7 @@ class TestVer2:
             Commands.off,
             extra_info=['Forecast min temperature: None', 'Outside temperature: 7',
                         'Target inside temperature: 6.0', 'Inside temperature: 5.5',
-                        'Current buffer: inf h () to temp 1 C', 'Current time_until_heat: inf h () temp 6 C'])
+                        'Current buffer: inf h () to temp 1 C', 'Current time_until_heat: inf h () to temp 6 C'])
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
@@ -684,7 +684,7 @@ class TestVer2:
             Commands.off, extra_info=['Forecast min temperature: None', 'Outside temperature: 15.5',
                                       'Target inside temperature: 6.0', 'Inside temperature: 23',
                                       'Current buffer: inf h () to temp 1 C',
-                                      'Current time_until_heat: inf h () temp 6 C'])
+                                      'Current time_until_heat: inf h () to temp 6 C'])
         mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
@@ -830,6 +830,102 @@ class TestVer2:
                 Commands.heat8, extra_info=['Forecast min temperature: -20', 'Outside temperature: 1',
                                             'Target inside temperature: 6.0', 'Inside temperature: 2',
                                             'Current buffer: 10.8 h (23.10.2017 04:48) to temp 1 C'])
+            mock_get_most_recent_message.assert_called_once_with(once=True)
+            mock_receive_wc_temperature.assert_called_once()
+            mock_receive_ulkoilma_temperature.assert_called_once()
+            mock_receive_fmi_temperature.assert_called_once()
+            mock_receive_open_weather_map_temperature.assert_called_once()
+            mock_receive_yr_no_forecast.assert_called_once()
+
+    def test_auto_ver2_hysteresis(self, mocker):
+        with freeze_time('2017-10-22T15:00:00+00:00'):
+            mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
+            mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
+            mock_receive_wc_temperature = mocker.patch(
+                'states.auto.receive_wc_temperature', return_value=(Decimal('7.3'), arrow.now().shift(minutes=-30)))
+            mock_receive_ulkoilma_temperature = mocker.patch(
+                'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(-3), arrow.now()))
+            mock_receive_fmi_temperature = mocker.patch(
+                'states.auto.receive_fmi_temperature', return_value=(Decimal(-7), arrow.now()))
+            mock_receive_open_weather_map_temperature = mocker.patch(
+                'states.auto.receive_open_weather_map_temperature',
+                return_value=(Decimal(-6), arrow.now().shift(minutes=-60)))
+            mock_receive_yr_no_forecast = mocker.patch(
+                'states.auto.receive_yr_no_forecast', return_value=gen_forecast([]))
+
+            auto = Auto()
+            Auto.last_command = Commands.heat8
+            auto.run({}, version=2)
+            Auto.last_command = None
+
+            mock_send_ir_signal.assert_called_once_with(
+                Commands.off,
+                extra_info=['Forecast min temperature: None', 'Outside temperature: -5',
+                            'Target inside temperature: 6.0', 'Inside temperature: 7.3',
+                            'Current buffer: 39.5 h (24.10.2017 09:30) to temp 1 C', 'Hysteresis: 7.2',
+                            'Current time_until_heat: 0.3 h (22.10.2017 18:18) to temp 7.2 C'])
+            mock_get_most_recent_message.assert_called_once_with(once=True)
+            mock_receive_wc_temperature.assert_called_once()
+            mock_receive_ulkoilma_temperature.assert_called_once()
+            mock_receive_fmi_temperature.assert_called_once()
+            mock_receive_open_weather_map_temperature.assert_called_once()
+            mock_receive_yr_no_forecast.assert_called_once()
+
+    def test_auto_ver2_hysteresis2(self, mocker):
+        with freeze_time('2017-10-22T15:00:00+00:00'):
+            mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
+            mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
+            mock_receive_wc_temperature = mocker.patch(
+                'states.auto.receive_wc_temperature', return_value=(Decimal('7.2'), arrow.now().shift(minutes=-30)))
+            mock_receive_ulkoilma_temperature = mocker.patch(
+                'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(-3), arrow.now()))
+            mock_receive_fmi_temperature = mocker.patch(
+                'states.auto.receive_fmi_temperature', return_value=(Decimal(-7), arrow.now()))
+            mock_receive_open_weather_map_temperature = mocker.patch(
+                'states.auto.receive_open_weather_map_temperature',
+                return_value=(Decimal(-6), arrow.now().shift(minutes=-60)))
+            mock_receive_yr_no_forecast = mocker.patch(
+                'states.auto.receive_yr_no_forecast', return_value=gen_forecast([]))
+
+            auto = Auto()
+            Auto.last_command = Commands.heat8
+            auto.run({}, version=2)
+            Auto.last_command = None
+
+            mock_send_ir_signal.assert_not_called()
+            mock_get_most_recent_message.assert_called_once_with(once=True)
+            mock_receive_wc_temperature.assert_called_once()
+            mock_receive_ulkoilma_temperature.assert_called_once()
+            mock_receive_fmi_temperature.assert_called_once()
+            mock_receive_open_weather_map_temperature.assert_called_once()
+            mock_receive_yr_no_forecast.assert_called_once()
+
+    def test_auto_ver2_hysteresis3(self, mocker):
+        with freeze_time('2017-10-22T15:00:00+00:00'):
+            mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
+            mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
+            mock_receive_wc_temperature = mocker.patch(
+                'states.auto.receive_wc_temperature', return_value=(Decimal('5.9'), arrow.now().shift(minutes=-30)))
+            mock_receive_ulkoilma_temperature = mocker.patch(
+                'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(0), arrow.now()))
+            mock_receive_fmi_temperature = mocker.patch(
+                'states.auto.receive_fmi_temperature', return_value=(Decimal(0), arrow.now()))
+            mock_receive_open_weather_map_temperature = mocker.patch(
+                'states.auto.receive_open_weather_map_temperature',
+                return_value=(Decimal(0), arrow.now().shift(minutes=-60)))
+            mock_receive_yr_no_forecast = mocker.patch(
+                'states.auto.receive_yr_no_forecast', return_value=gen_forecast([]))
+
+            auto = Auto()
+            Auto.last_command = Commands.off
+            auto.run({}, version=2)
+            Auto.last_command = None
+
+            mock_send_ir_signal.assert_called_once_with(
+                Commands.heat8,
+                extra_info=['Forecast min temperature: None', 'Outside temperature: 0',
+                            'Target inside temperature: 6.0', 'Inside temperature: 5.9',
+                            'Current buffer: 97.7 h (26.10.2017 19:42) to temp 1 C', 'Hysteresis: 6.7'])
             mock_get_most_recent_message.assert_called_once_with(once=True)
             mock_receive_wc_temperature.assert_called_once()
             mock_receive_ulkoilma_temperature.assert_called_once()
