@@ -3,7 +3,7 @@ import json
 import logging
 import smtplib
 import time
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from email.mime.text import MIMEText
 from functools import wraps
 from subprocess import Popen, PIPE
@@ -321,3 +321,31 @@ def median(data):
         ts = data[i - 1][1].shift(seconds=secs)
 
     return temp, ts
+
+
+def decimal_round(value, decimals=1):
+    if value is None:
+        return None
+
+    if not isinstance(value, Decimal):
+        value = Decimal(value)
+
+    rounder = '.' + ('0' * (decimals - 1)) + '1'
+
+    return value.quantize(Decimal(rounder), rounding=ROUND_HALF_UP)
+
+
+def log_temp_info():
+    from states.auto import target_inside_temperature
+
+    for outside_temp in [-20, -15, -10, -5, 0, 5]:
+        outside_temp_ts = TempTs(Decimal(outside_temp), arrow.now())
+
+        target_inside_temp = target_inside_temperature(
+            outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
+        target_inside_temp_hysteresis_high = target_inside_temperature(
+            outside_temp_ts, target_inside_temp, None, Decimal(6))
+
+        logger.info('Target inside %s (hysteresis %s) when outside is %s',
+                    decimal_round(target_inside_temp, 2), decimal_round(target_inside_temp_hysteresis_high, 2),
+                    outside_temp)
