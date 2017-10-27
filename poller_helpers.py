@@ -230,7 +230,8 @@ class InitPygsheets:
         logger.info('Init pygsheets')
         gc = pygsheets.authorize(
             outh_file=config.SHEET_OAUTH_FILE,
-            outh_nonlocal=True)
+            outh_nonlocal=True,
+            no_cache=True)
         cls._sh = gc.open_by_key(config.SHEET_KEY)
 
 
@@ -293,7 +294,7 @@ def get_temp_from_sheet(sheet_index):
             ts_and_temp = wks.range('B2:C2')[0]
             if len(ts_and_temp) == 2:
                 ts, temp = ts_and_temp
-                ts = ts.value_unformatted
+                ts = ts.value
                 temp = temp.value_unformatted
         except pygsheets.exceptions.RequestError as e:
             logger.exception(e)
