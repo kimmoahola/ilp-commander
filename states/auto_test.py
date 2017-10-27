@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from decimal import Decimal
+import random
 
 import arrow
 import pytest
@@ -60,6 +61,53 @@ def gen_forecast(forecast):
     start = arrow.now().shift(minutes=30)
     # start = arrow.now().shift(minutes=30)
     return Forecast(temps=[TempTs(temp=Decimal(f), ts=start.shift(hours=i)) for i, f in enumerate(forecast)], ts=arrow.now())
+
+
+def mocker_init(mocker):
+    mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
+    mocker.patch('states.auto.get_most_recent_message')
+    mocker.patch('states.auto.write_log_to_sheet')
+    return mock_send_ir_signal
+
+
+def mock_inside(mocker, temp):
+    if temp is not None:
+        mocker.patch('states.auto.receive_wc_temperature', return_value=(Decimal(temp), arrow.now().shift(minutes=-59)))
+    else:
+        mocker.patch('states.auto.receive_wc_temperature', return_value=(Decimal(500), arrow.now().shift(minutes=-60)))
+
+
+def mock_outside(mocker, temp, forecast_average=None):
+    if temp is not None:
+        temp = Decimal(temp)
+        temps = [temp - 5, temp + 5, None]
+        random.shuffle(temps)
+    else:
+        temps = [None] * 3
+
+    mocker.patch('states.auto.receive_ulkoilma_temperature', return_value=(temps[0], arrow.now().shift(minutes=-59)))
+    mocker.patch('states.auto.receive_fmi_temperature', return_value=(temps[1], arrow.now().shift(minutes=59)))
+    mocker.patch('states.auto.receive_open_weather_map_temperature',
+                 return_value=(temps[2], arrow.now().shift(minutes=-59)))
+
+    forecast = []
+
+    if forecast_average is None:
+        forecast_average = temp
+
+    if forecast_average is not None:
+        # average of the forecast becomes the same as temp
+        for i in range(48):
+            if len(forecast) % 2 == 1:
+                forecast.append(-forecast[-1] + forecast_average * 2)
+            else:
+                forecast.append(Decimal(random.uniform(float(forecast_average - 10), float(forecast_average + 10))))
+
+    mocker.patch('states.auto.receive_yr_no_forecast', return_value=gen_forecast(forecast))
+
+
+def assert_ir_call(mock_send_ir_signal, command):
+    assert mock_send_ir_signal.call_args[0][0] == command, mock_send_ir_signal.call_args
 
 
 class TestGeneral:
@@ -178,8 +226,7 @@ class TestGeneral:
 class TestVer1:
 
     def test_auto_ver1_warm_inside(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
+        mock_send_ir_signal = mocker_init(mocker)
         mock_receive_wc_temperature = mocker.patch(
             'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now()))
         mock_receive_ulkoilma_temperature = mocker.patch(
@@ -194,15 +241,13 @@ class TestVer1:
         Auto.last_command = None
 
         mock_send_ir_signal.assert_called_once_with(Commands.off, extra_info=['Inside temperature: 8'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_not_called()
         mock_receive_open_weather_map_temperature.assert_not_called()
         mock_receive_fmi_temperature.assert_not_called()
 
     def test_auto_ver1_invalid_inside(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
+        mock_send_ir_signal = mocker_init(mocker)
         mock_receive_wc_temperature = mocker.patch(
             'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now().shift(minutes=-60)))
         mock_receive_ulkoilma_temperature = mocker.patch(
@@ -218,15 +263,13 @@ class TestVer1:
 
         mock_send_ir_signal.assert_called_once_with(
             Commands.off, extra_info=['Inside temperature: None', 'Outside temperature: 7'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
 
     def test_auto_ver1_invalid_all_temperatures(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
+        mock_send_ir_signal = mocker_init(mocker)
         mock_receive_wc_temperature = mocker.patch(
             'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now().shift(minutes=-60)))
         mock_receive_ulkoilma_temperature = mocker.patch(
@@ -243,15 +286,13 @@ class TestVer1:
         mock_send_ir_signal.assert_called_once_with(
             Commands.heat16,
             extra_info=['Inside temperature: None', 'Outside temperature: None', 'Got no temperatures at all.'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
 
     def test_auto_ver1_cold_inside(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
+        mock_send_ir_signal = mocker_init(mocker)
         mock_receive_wc_temperature = mocker.patch(
             'states.auto.receive_wc_temperature', return_value=(Decimal('7.5'), arrow.now().shift(minutes=-30)))
         mock_receive_ulkoilma_temperature = mocker.patch(
@@ -267,15 +308,13 @@ class TestVer1:
 
         mock_send_ir_signal.assert_called_once_with(
             Commands.off, extra_info=['Inside temperature: 7.5', 'Outside temperature: 5'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
 
     def test_auto_ver1_cold_inside_and_outside(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
+        mock_send_ir_signal = mocker_init(mocker)
         mock_receive_wc_temperature = mocker.patch(
             'states.auto.receive_wc_temperature', return_value=(Decimal('7.5'), arrow.now().shift(minutes=-30)))
         mock_receive_ulkoilma_temperature = mocker.patch(
@@ -291,15 +330,13 @@ class TestVer1:
 
         mock_send_ir_signal.assert_called_once_with(
             Commands.heat8, extra_info=['Inside temperature: 7.5', 'Outside temperature: -5'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_open_weather_map_temperature.assert_called_once()
         mock_receive_fmi_temperature.assert_called_once()
 
     def test_auto_ver1_very_cold_inside_and_outside(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
+        mock_send_ir_signal = mocker_init(mocker)
         mock_receive_wc_temperature = mocker.patch(
             'states.auto.receive_wc_temperature', return_value=(Decimal(1), arrow.now().shift(minutes=-30)))
         mock_receive_ulkoilma_temperature = mocker.patch(
@@ -315,7 +352,6 @@ class TestVer1:
 
         mock_send_ir_signal.assert_called_once_with(
             Commands.heat16, extra_info=['Inside temperature: 1', 'Outside temperature: -20'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
         mock_receive_wc_temperature.assert_called_once()
         mock_receive_ulkoilma_temperature.assert_called_once()
         mock_receive_open_weather_map_temperature.assert_called_once()
@@ -324,12 +360,16 @@ class TestVer1:
 
 class TestVer2:
 
+    @staticmethod
+    def run_auto_ver2():
+        Auto.last_command = None
+        auto = Auto()
+        auto.run({}, version=2)
+        Auto.last_command = None
+
     @pytest.mark.skipif(has_invalid_sheet(),
                         reason='No sheet OAuth file or key in config')
     def test_auto_ver2_message_wait(self, mocker):
-        # TODO: jää jumiin joskus
-
-
         mocker.patch('states.auto.send_ir_signal')
         mock_healthcheck = mocker.patch('poller_helpers.get_url')  # mock health check
         mock_time_sleep = mocker.patch('time.sleep')
@@ -363,363 +403,92 @@ class TestVer2:
         assert auto.nex(payload) == Auto
 
     def test_auto_ver2_warm_inside(self, mocker):
-        with freeze_time('2017-10-22T05:00:00+00:00'):
-            mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-            mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-            mock_receive_wc_temperature = mocker.patch(
-                'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now()))
-            mock_receive_ulkoilma_temperature = mocker.patch(
-                'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(3), arrow.now()))
-            mock_receive_fmi_temperature = mocker.patch(
-                'states.auto.receive_fmi_temperature', return_value=(Decimal(7), arrow.now()))
-            mock_receive_open_weather_map_temperature = mocker.patch(
-                'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(5), arrow.now()))
-            mock_receive_yr_no_forecast = mocker.patch(
-                'states.auto.receive_yr_no_forecast', return_value=gen_forecast([1, 3]))
+        mock_send_ir_signal = mocker_init(mocker)
+        mock_inside(mocker, config.MINIMUM_INSIDE_TEMP)
+        mock_outside(mocker, config.MINIMUM_INSIDE_TEMP - 1)
 
-            auto = Auto()
-            auto.run({}, version=2)
-            Auto.last_command = None
-
-            mock_send_ir_signal.assert_called_once_with(
-                Commands.off, extra_info=['Forecast min temperature: 1', 'Outside temperature: 5',
-                                          'Target inside temperature: 6.0', 'Inside temperature: 8',
-                                          'Current buffer: inf h () to temp 1 C',
-                                          'Current time_until_heat: 28.0 h (23.10.2017 12:00) to temp 6 C'])
-            mock_get_most_recent_message.assert_called_once_with(once=True)
-            mock_receive_wc_temperature.assert_called_once()
-            mock_receive_ulkoilma_temperature.assert_called_once()
-            mock_receive_fmi_temperature.assert_called_once()
-            mock_receive_open_weather_map_temperature.assert_called_once()
-            mock_receive_yr_no_forecast.assert_called_once()
-
-    def test_auto_ver2_invalid_inside(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-        mock_receive_wc_temperature = mocker.patch(
-            'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now().shift(minutes=-60)))
-        mock_receive_ulkoilma_temperature = mocker.patch(
-            'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(3), arrow.now()))
-        mock_receive_fmi_temperature = mocker.patch(
-            'states.auto.receive_fmi_temperature', return_value=(Decimal(7), arrow.now()))
-        mock_receive_open_weather_map_temperature = mocker.patch(
-            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(5), arrow.now()))
-        mock_receive_yr_no_forecast = mocker.patch(
-            'states.auto.receive_yr_no_forecast', return_value=gen_forecast([1, 3]))
-
-        auto = Auto()
-        auto.run({}, version=2)
-        Auto.last_command = None
-
-        mock_send_ir_signal.assert_called_once_with(
-            Commands.heat8,
-            extra_info=['Forecast min temperature: 1', 'Outside temperature: 5',
-                        'Target inside temperature: 6.0', 'Inside temperature: None'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
-        mock_receive_wc_temperature.assert_called_once()
-        mock_receive_ulkoilma_temperature.assert_called_once()
-        mock_receive_fmi_temperature.assert_called_once()
-        mock_receive_open_weather_map_temperature.assert_called_once()
-        mock_receive_yr_no_forecast.assert_called_once()
-
-    def test_auto_ver2_invalid_inside_high_outside(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-        mock_receive_wc_temperature = mocker.patch(
-            'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now().shift(minutes=-60)))
-        mock_receive_ulkoilma_temperature = mocker.patch(
-            'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(10), arrow.now()))
-        mock_receive_fmi_temperature = mocker.patch(
-            'states.auto.receive_fmi_temperature', return_value=(Decimal(12), arrow.now()))
-        mock_receive_open_weather_map_temperature = mocker.patch(
-            'states.auto.receive_open_weather_map_temperature', return_value=(None, None))
-        mock_receive_yr_no_forecast = mocker.patch(
-            'states.auto.receive_yr_no_forecast', return_value=gen_forecast([10, 9]))
-
-        auto = Auto()
-        auto.run({}, version=2)
-        Auto.last_command = None
-
-        mock_send_ir_signal.assert_called_once_with(
-            Commands.off,
-            extra_info=['Forecast min temperature: 9', 'Outside temperature: 11',
-                        'Target inside temperature: 6.0', 'Inside temperature: None'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
-        mock_receive_wc_temperature.assert_called_once()
-        mock_receive_ulkoilma_temperature.assert_called_once()
-        mock_receive_fmi_temperature.assert_called_once()
-        mock_receive_open_weather_map_temperature.assert_called_once()
-        mock_receive_yr_no_forecast.assert_called_once()
-
-    def test_auto_ver2_invalid_outside_high_forecast(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-        mock_receive_wc_temperature = mocker.patch(
-            'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now()))
-        mock_receive_ulkoilma_temperature = mocker.patch(
-            'states.auto.receive_ulkoilma_temperature', return_value=(None, None))
-        mock_receive_fmi_temperature = mocker.patch(
-            'states.auto.receive_fmi_temperature', return_value=(None, None))
-        mock_receive_open_weather_map_temperature = mocker.patch(
-            'states.auto.receive_open_weather_map_temperature', return_value=(None, None))
-        mock_receive_yr_no_forecast = mocker.patch(
-            'states.auto.receive_yr_no_forecast', return_value=gen_forecast([20, 30]))
-
-        auto = Auto()
-        auto.run({}, version=2)
-        Auto.last_command = None
-
-        mock_send_ir_signal.assert_called_once_with(
-            Commands.off, extra_info=['Forecast min temperature: 20', 'Outside temperature: None',
-                                      'Using forecast: 20', 'Target inside temperature: 6.0', 'Inside temperature: 8',
-                                      'Current buffer: inf h () to temp 1 C',
-                                      'Current time_until_heat: inf h () to temp 6 C'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
-        mock_receive_wc_temperature.assert_called_once()
-        mock_receive_ulkoilma_temperature.assert_called_once()
-        mock_receive_fmi_temperature.assert_called_once()
-        mock_receive_open_weather_map_temperature.assert_called_once()
-        mock_receive_yr_no_forecast.assert_called_once()
-
-    def test_auto_ver2_invalid_outside_low_forecast(self, mocker):
-        with freeze_time('2017-10-22T05:00:00+00:00'):
-            mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-            mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-            mock_receive_wc_temperature = mocker.patch(
-                'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now()))
-            mock_receive_ulkoilma_temperature = mocker.patch(
-                'states.auto.receive_ulkoilma_temperature', return_value=(None, None))
-            mock_receive_fmi_temperature = mocker.patch(
-                'states.auto.receive_fmi_temperature', return_value=(None, None))
-            mock_receive_open_weather_map_temperature = mocker.patch(
-                'states.auto.receive_open_weather_map_temperature', return_value=(None, None))
-            mock_receive_yr_no_forecast = mocker.patch(
-                'states.auto.receive_yr_no_forecast', return_value=gen_forecast([2, 3]))
-
-            auto = Auto()
-            auto.run({}, version=2)
-            Auto.last_command = None
-
-            mock_send_ir_signal.assert_called_once_with(
-                Commands.off,
-                extra_info=['Forecast min temperature: 2', 'Outside temperature: None', 'Using forecast: 2',
-                            'Target inside temperature: 6.0', 'Inside temperature: 8',
-                            'Current buffer: inf h () to temp 1 C',
-                            'Current time_until_heat: 23.9 h (23.10.2017 07:54) to temp 6 C'])
-            mock_get_most_recent_message.assert_called_once_with(once=True)
-            mock_receive_wc_temperature.assert_called_once()
-            mock_receive_ulkoilma_temperature.assert_called_once()
-            mock_receive_fmi_temperature.assert_called_once()
-            mock_receive_open_weather_map_temperature.assert_called_once()
-            mock_receive_yr_no_forecast.assert_called_once()
-
-    def test_auto_ver2_invalid_outside_and_inside_low_forecast(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-        mock_receive_wc_temperature = mocker.patch(
-            'states.auto.receive_wc_temperature', return_value=(None, None))
-        mock_receive_ulkoilma_temperature = mocker.patch(
-            'states.auto.receive_ulkoilma_temperature', return_value=(None, None))
-        mock_receive_fmi_temperature = mocker.patch(
-            'states.auto.receive_fmi_temperature', return_value=(None, None))
-        mock_receive_open_weather_map_temperature = mocker.patch(
-            'states.auto.receive_open_weather_map_temperature', return_value=(None, None))
-        mock_receive_yr_no_forecast = mocker.patch(
-            'states.auto.receive_yr_no_forecast', return_value=gen_forecast([2, 3]))
-
-        auto = Auto()
-        auto.run({}, version=2)
-        Auto.last_command = None
-
-        mock_send_ir_signal.assert_called_once_with(
-            Commands.heat8,
-            extra_info=['Forecast min temperature: 2', 'Outside temperature: None', 'Using forecast: 2',
-                        'Target inside temperature: 6.0', 'Inside temperature: None'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
-        mock_receive_wc_temperature.assert_called_once()
-        mock_receive_ulkoilma_temperature.assert_called_once()
-        mock_receive_fmi_temperature.assert_called_once()
-        mock_receive_open_weather_map_temperature.assert_called_once()
-        mock_receive_yr_no_forecast.assert_called_once()
-
-    def test_auto_ver2_invalid_all_temperatures(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-        mock_receive_wc_temperature = mocker.patch(
-            'states.auto.receive_wc_temperature', return_value=(Decimal(8), arrow.now().shift(minutes=-60)))
-        mock_receive_ulkoilma_temperature = mocker.patch(
-            'states.auto.receive_ulkoilma_temperature', return_value=(None, None))
-        mock_receive_fmi_temperature = mocker.patch(
-            'states.auto.receive_fmi_temperature', return_value=(None, None))
-        mock_receive_open_weather_map_temperature = mocker.patch(
-            'states.auto.receive_open_weather_map_temperature', return_value=(None, None))
-        mock_receive_yr_no_forecast = mocker.patch(
-            'states.auto.receive_yr_no_forecast', return_value=gen_forecast([]))
-
-        auto = Auto()
-        auto.run({}, version=2)
-        Auto.last_command = None
-
-        mock_send_ir_signal.assert_called_once_with(
-            Commands.heat8, extra_info=['Forecast min temperature: None', 'Outside temperature: None',
-                                        'Using predefined outside temperature: -10', 'Target inside temperature: 6.9',
-                                        'Inside temperature: None'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
-        mock_receive_wc_temperature.assert_called_once()
-        mock_receive_ulkoilma_temperature.assert_called_once()
-        mock_receive_fmi_temperature.assert_called_once()
-        mock_receive_open_weather_map_temperature.assert_called_once()
-        mock_receive_yr_no_forecast.assert_called_once()
+        self.run_auto_ver2()
+        assert_ir_call(mock_send_ir_signal, Commands.off)
 
     def test_auto_ver2_cold_inside(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-        mock_receive_wc_temperature = mocker.patch(
-            'states.auto.receive_wc_temperature', return_value=(Decimal('5.5'), arrow.now().shift(minutes=-30)))
-        mock_receive_ulkoilma_temperature = mocker.patch(
-            'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(7), arrow.now()))
-        mock_receive_fmi_temperature = mocker.patch(
-            'states.auto.receive_fmi_temperature', return_value=(Decimal(7), arrow.now()))
-        mock_receive_open_weather_map_temperature = mocker.patch(
-            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(6), arrow.now()))
-        mock_receive_yr_no_forecast = mocker.patch(
-            'states.auto.receive_yr_no_forecast', return_value=gen_forecast([]))
+        mock_send_ir_signal = mocker_init(mocker)
+        mock_inside(mocker, config.MINIMUM_INSIDE_TEMP - 1)
+        mock_outside(mocker, config.MINIMUM_INSIDE_TEMP - 1)
 
-        auto = Auto()
-        auto.run({}, version=2)
-        Auto.last_command = None
+        self.run_auto_ver2()
+        assert_ir_call(mock_send_ir_signal, Commands.heat8)
 
-        mock_send_ir_signal.assert_called_once_with(
-            Commands.off,
-            extra_info=['Forecast min temperature: None', 'Outside temperature: 7',
-                        'Target inside temperature: 6.0', 'Inside temperature: 5.5',
-                        'Current buffer: inf h () to temp 1 C', 'Current time_until_heat: inf h () to temp 6 C'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
-        mock_receive_wc_temperature.assert_called_once()
-        mock_receive_ulkoilma_temperature.assert_called_once()
-        mock_receive_fmi_temperature.assert_called_once()
-        mock_receive_open_weather_map_temperature.assert_called_once()
-        mock_receive_yr_no_forecast.assert_called_once()
+    def test_auto_ver2_invalid_inside_low_outside(self, mocker):
+        mock_send_ir_signal = mocker_init(mocker)
+        mock_inside(mocker, None)
+        mock_outside(mocker, config.MINIMUM_INSIDE_TEMP - 1, config.MINIMUM_INSIDE_TEMP - 5)
+
+        self.run_auto_ver2()
+        assert_ir_call(mock_send_ir_signal, Commands.heat8)
+
+    def test_auto_ver2_invalid_inside_high_outside(self, mocker):
+        mock_send_ir_signal = mocker_init(mocker)
+        mock_inside(mocker, None)
+        mock_outside(mocker, config.MINIMUM_INSIDE_TEMP + 1)
+
+        self.run_auto_ver2()
+        assert_ir_call(mock_send_ir_signal, Commands.off)
+
+    def test_auto_ver2_invalid_outside_high_forecast(self, mocker):
+        mock_send_ir_signal = mocker_init(mocker)
+        mock_inside(mocker, config.MINIMUM_INSIDE_TEMP - 1)
+        mock_outside(mocker, None, config.MINIMUM_INSIDE_TEMP + 10)
+
+        self.run_auto_ver2()
+        assert_ir_call(mock_send_ir_signal, Commands.off)
+
+    def test_auto_ver2_invalid_outside_low_forecast(self, mocker):
+        mock_send_ir_signal = mocker_init(mocker)
+        mock_inside(mocker, config.MINIMUM_INSIDE_TEMP + 1)
+        mock_outside(mocker, None, config.MINIMUM_INSIDE_TEMP - 10)
+
+        self.run_auto_ver2()
+        assert_ir_call(mock_send_ir_signal, Commands.off)
+
+    def test_auto_ver2_invalid_outside_and_inside_low_forecast(self, mocker):
+        mock_send_ir_signal = mocker_init(mocker)
+        mock_inside(mocker, None)
+        mock_outside(mocker, None, config.MINIMUM_INSIDE_TEMP - 5)
+
+        self.run_auto_ver2()
+        assert_ir_call(mock_send_ir_signal, Commands.heat8)
+
+    def test_auto_ver2_all_invalid(self, mocker):
+        mock_send_ir_signal = mocker_init(mocker)
+        mock_inside(mocker, None)
+        mock_outside(mocker, None)
+
+        self.run_auto_ver2()
+        assert_ir_call(mock_send_ir_signal, Commands.heat8)
 
     def test_auto_ver2_cold_inside_and_outside(self, mocker):
-        with freeze_time('2017-10-22T15:00:00+00:00'):
-            mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-            mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-            mock_receive_wc_temperature = mocker.patch(
-                'states.auto.receive_wc_temperature', return_value=(Decimal(2), arrow.now().shift(minutes=-30)))
-            mock_receive_ulkoilma_temperature = mocker.patch(
-                'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(-3), arrow.now()))
-            mock_receive_fmi_temperature = mocker.patch(
-                'states.auto.receive_fmi_temperature', return_value=(Decimal(-7), arrow.now()))
-            mock_receive_open_weather_map_temperature = mocker.patch(
-                'states.auto.receive_open_weather_map_temperature',
-                return_value=(Decimal(-6), arrow.now().shift(minutes=-60)))
-            mock_receive_yr_no_forecast = mocker.patch(
-                'states.auto.receive_yr_no_forecast', return_value=gen_forecast([]))
+        mock_send_ir_signal = mocker_init(mocker)
+        mock_inside(mocker, config.MINIMUM_INSIDE_TEMP - 1)
+        mock_outside(mocker, config.MINIMUM_INSIDE_TEMP - 5)
 
-            auto = Auto()
-            auto.run({}, version=2)
-            Auto.last_command = None
-
-            mock_send_ir_signal.assert_called_once_with(
-                Commands.heat8,
-                extra_info=['Forecast min temperature: None', 'Outside temperature: -5',
-                            'Target inside temperature: 6.0', 'Inside temperature: 2',
-                            'Current buffer: 8.5 h (23.10.2017 02:30) to temp 1 C'])
-            mock_get_most_recent_message.assert_called_once_with(once=True)
-            mock_receive_wc_temperature.assert_called_once()
-            mock_receive_ulkoilma_temperature.assert_called_once()
-            mock_receive_fmi_temperature.assert_called_once()
-            mock_receive_open_weather_map_temperature.assert_called_once()
-            mock_receive_yr_no_forecast.assert_called_once()
+        self.run_auto_ver2()
+        assert_ir_call(mock_send_ir_signal, Commands.heat8)
 
     def test_auto_ver2_very_cold_inside_and_outside(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-        mock_receive_wc_temperature = mocker.patch(
-            'states.auto.receive_wc_temperature', return_value=(Decimal(1), arrow.now().shift(minutes=-30)))
-        mock_receive_ulkoilma_temperature = mocker.patch(
-            'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(-18), arrow.now()))
-        mock_receive_fmi_temperature = mocker.patch(
-            'states.auto.receive_fmi_temperature', return_value=(Decimal(-21), arrow.now()))
-        mock_receive_open_weather_map_temperature = mocker.patch(
-            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal('-19.5'), arrow.now()))
-        mock_receive_yr_no_forecast = mocker.patch(
-            'states.auto.receive_yr_no_forecast', return_value=gen_forecast([]))
+        mock_send_ir_signal = mocker_init(mocker)
+        mock_inside(mocker, config.MINIMUM_INSIDE_TEMP - 4)
+        mock_outside(mocker, config.MINIMUM_INSIDE_TEMP - 23)
 
-        auto = Auto()
-        auto.run({}, version=2)
-        Auto.last_command = None
-
-        mock_send_ir_signal.assert_called_once_with(
-            Commands.heat16,
-            extra_info=['Forecast min temperature: None', 'Outside temperature: -19.5',
-                        'Target inside temperature: 12.0', 'Inside temperature: 1'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
-        mock_receive_wc_temperature.assert_called_once()
-        mock_receive_ulkoilma_temperature.assert_called_once()
-        mock_receive_fmi_temperature.assert_called_once()
-        mock_receive_open_weather_map_temperature.assert_called_once()
-        mock_receive_yr_no_forecast.assert_called_once()
+        self.run_auto_ver2()
+        assert_ir_call(mock_send_ir_signal, Commands.heat16)
 
     def test_auto_ver2_warm_inside_and_outside(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-        mock_receive_wc_temperature = mocker.patch(
-            'states.auto.receive_wc_temperature', return_value=(Decimal(23), arrow.now()))
-        mock_receive_ulkoilma_temperature = mocker.patch(
-            'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(15), arrow.now()))
-        mock_receive_fmi_temperature = mocker.patch(
-            'states.auto.receive_fmi_temperature', return_value=(Decimal(16), arrow.now()))
-        mock_receive_open_weather_map_temperature = mocker.patch(
-            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal('15.5'), arrow.now()))
-        mock_receive_yr_no_forecast = mocker.patch(
-            'states.auto.receive_yr_no_forecast', return_value=gen_forecast([]))
+        mock_send_ir_signal = mocker_init(mocker)
+        mock_inside(mocker, config.MINIMUM_INSIDE_TEMP + 5)
+        mock_outside(mocker, config.MINIMUM_INSIDE_TEMP + 10)
 
-        auto = Auto()
-        auto.run({}, version=2)
-        Auto.last_command = None
-
-        mock_send_ir_signal.assert_called_once_with(
-            Commands.off, extra_info=['Forecast min temperature: None', 'Outside temperature: 15.5',
-                                      'Target inside temperature: 6.0', 'Inside temperature: 23',
-                                      'Current buffer: inf h () to temp 1 C',
-                                      'Current time_until_heat: inf h () to temp 6 C'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
-        mock_receive_wc_temperature.assert_called_once()
-        mock_receive_ulkoilma_temperature.assert_called_once()
-        mock_receive_fmi_temperature.assert_called_once()
-        mock_receive_open_weather_map_temperature.assert_called_once()
-        mock_receive_yr_no_forecast.assert_called_once()
-
-    def test_auto_ver2_buffer_diff_division_by_zero(self, mocker):
-        mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
-        mock_get_most_recent_message = mocker.patch('states.auto.get_most_recent_message')
-        mock_receive_wc_temperature = mocker.patch(
-            'states.auto.receive_wc_temperature', return_value=(Decimal(3), arrow.now()))
-        mock_receive_ulkoilma_temperature = mocker.patch(
-            'states.auto.receive_ulkoilma_temperature', return_value=(Decimal(2), arrow.now()))
-        mock_receive_fmi_temperature = mocker.patch(
-            'states.auto.receive_fmi_temperature', return_value=(Decimal(2), arrow.now()))
-        mock_receive_open_weather_map_temperature = mocker.patch(
-            'states.auto.receive_open_weather_map_temperature', return_value=(Decimal(2), arrow.now()))
-        mock_receive_yr_no_forecast = mocker.patch(
-            'states.auto.receive_yr_no_forecast', return_value=gen_forecast([]))
-
-        auto = Auto()
-        auto.run({}, version=2)
-        Auto.last_command = None
-
-        mock_send_ir_signal.assert_called_once_with(
-            Commands.heat8, extra_info=['Forecast min temperature: None', 'Outside temperature: 2',
-                                        'Target inside temperature: 6.0', 'Inside temperature: 3',
-                                        'Current buffer: inf h () to temp 1 C'])
-        mock_get_most_recent_message.assert_called_once_with(once=True)
-        mock_receive_wc_temperature.assert_called_once()
-        mock_receive_ulkoilma_temperature.assert_called_once()
-        mock_receive_fmi_temperature.assert_called_once()
-        mock_receive_open_weather_map_temperature.assert_called_once()
-        mock_receive_yr_no_forecast.assert_called_once()
+        self.run_auto_ver2()
+        assert_ir_call(mock_send_ir_signal, Commands.off)
 
     def test_auto_ver2_buffer(self, mocker):
         with freeze_time('2017-10-22T15:00:00+00:00'):
