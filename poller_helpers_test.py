@@ -42,3 +42,15 @@ def test_send_ir_signal_ok(mocker):
         'Send IR heat_20__fan_auto__swing_auto at 18.08.2017 18:00\nFoo1\nFoo2')
 
     mock_popen.assert_called_once()
+
+
+def test_command():
+    assert Commands.find_command_just_above_temp(Decimal(31)) == Commands.heat30
+    assert Commands.find_command_just_above_temp(Decimal(10)) == Commands.heat16
+    assert Commands.find_command_just_above_temp(Decimal(8)) == Commands.heat10
+    assert Commands.find_command_just_above_temp(Decimal(7)) == Commands.heat8
+
+    assert Commands.find_command_at_or_just_below_temp(Decimal(7)) == Commands.off
+    assert Commands.find_command_at_or_just_below_temp(Decimal(8)) == Commands.heat8
+    assert Commands.find_command_at_or_just_below_temp(Decimal(9)) == Commands.heat8
+    assert Commands.find_command_at_or_just_below_temp(Decimal(31)) == Commands.heat30
