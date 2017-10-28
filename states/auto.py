@@ -336,7 +336,7 @@ def target_inside_temperature(outside_temp_ts: TempTs, allowed_min_inside_temp: 
 
 
 def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside_temp: Decimal,
-               forecast: Forecast) -> Decimal:
+               forecast: Union[Forecast, None]) -> Decimal:
     buffer = Decimal(0)  # hours
 
     # from pprint import pprint
@@ -432,6 +432,8 @@ def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside
 
 
 class Auto(State):
+
+    hysteresis_time_hours = Decimal(6)
 
     min_forecast_temp = None
     last_command = None
@@ -550,7 +552,7 @@ class Auto(State):
                 extra_info.append('Current buffer: %s h (%s) to temp %s C' % (buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
 
         target_inside_temp_hysteresis_high = target_inside_temperature(
-            TempTs(temp=outside_temp, ts=outside_ts), target_inside_temp, forecast, Decimal(6))
+            TempTs(temp=outside_temp, ts=outside_ts), target_inside_temp, forecast, Auto.hysteresis_time_hours)
         target_inside_temp_hysteresis_low = target_inside_temp
 
         if last_command and 'heat' in last_command:
@@ -561,16 +563,20 @@ class Auto(State):
         logger.info('Hysteresis: %s', target_inside_temp_hysteresis_high)
         extra_info.append('Hysteresis: %s' % decimal_round(target_inside_temp_hysteresis_high))
 
-        if inside_temp is not None:
-            if outside_temp < target_inside_temp_hysteresis_low and inside_temp < target_inside_temp:
-                next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_high)
-            else:
-                next_command = Commands.off
+        if target_inside_temp_hysteresis_low > config.MINIMUM_INSIDE_TEMP:
+            # keep ILP always turned on
+            next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
         else:
-            if outside_temp < target_inside_temp_hysteresis_low:
-                next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
+            if inside_temp is not None:
+                if outside_temp < target_inside_temp_hysteresis_low and inside_temp < target_inside_temp:
+                    next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_high)
+                else:
+                    next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
             else:
-                next_command = Commands.off
+                if outside_temp < target_inside_temp_hysteresis_low:
+                    next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
+                else:
+                    next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
 
         if inside_temp is not None and next_command == Commands.off:
             time_until_heat = get_buffer(inside_temp, TempTs(temp=outside_temp, ts=outside_ts), target_inside_temp, forecast)

@@ -67,6 +67,31 @@ class Commands:
 
         return Commands.heat8
 
+    @staticmethod
+    def find_command_at_or_just_below_temp(temp: Decimal):
+        if temp < 8:
+            return Commands.off
+        if temp < 10:
+            return Commands.heat8
+        if temp < 16:
+            return Commands.heat10
+        if temp < 18:
+            return Commands.heat16
+        if temp < 20:
+            return Commands.heat18
+        if temp < 22:
+            return Commands.heat20
+        if temp < 24:
+            return Commands.heat22
+        if temp < 26:
+            return Commands.heat24
+        if temp < 28:
+            return Commands.heat26
+        if temp < 30:
+            return Commands.heat28
+
+        return Commands.heat30
+
 
 db = orm.Database()
 
@@ -295,7 +320,7 @@ def get_temp_from_sheet(sheet_index):
             if len(ts_and_temp) == 2:
                 ts, temp = ts_and_temp
                 ts = ts.value
-                temp = temp.value_unformatted
+                temp = decimal_round(temp.value_unformatted, 3)
         except pygsheets.exceptions.RequestError as e:
             logger.exception(e)
         except Exception as e:
@@ -336,7 +361,7 @@ def decimal_round(value, decimals=1):
 
 
 def log_temp_info():
-    from states.auto import target_inside_temperature
+    from states.auto import Auto, target_inside_temperature, get_buffer
 
     for outside_temp in [-20, -15, -10, -5, 0, 5]:
         outside_temp_ts = TempTs(Decimal(outside_temp), arrow.now())
@@ -344,8 +369,10 @@ def log_temp_info():
         target_inside_temp = target_inside_temperature(
             outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
         target_inside_temp_hysteresis_high = target_inside_temperature(
-            outside_temp_ts, target_inside_temp, None, Decimal(6))
+            outside_temp_ts, target_inside_temp, None, Auto.hysteresis_time_hours)
 
-        logger.info('Target inside %s (hysteresis %s) when outside is %s',
+        buffer = get_buffer(target_inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
+
+        logger.info('Target inside %s (hysteresis %s) when outside is %s. Buffer %s h',
                     decimal_round(target_inside_temp, 2), decimal_round(target_inside_temp_hysteresis_high, 2),
-                    outside_temp)
+                    outside_temp, buffer)
