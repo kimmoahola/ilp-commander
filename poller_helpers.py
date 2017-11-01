@@ -1,6 +1,7 @@
 # coding=utf-8
 import json
 import logging
+import os
 import smtplib
 import time
 from decimal import Decimal, ROUND_HALF_UP
@@ -376,3 +377,16 @@ def log_temp_info():
         logger.info('Target inside %s (hysteresis %s) when outside is %s. Buffer %s h',
                     decimal_round(target_inside_temp, 2), decimal_round(target_inside_temp_hysteresis_high, 2),
                     outside_temp, buffer)
+
+
+def have_valid_time():
+
+    for i in range(3):
+        if i > 0:
+            # Sleep only between reads
+            time.sleep(10)
+
+        if os.system("(ntpq -pn | egrep '^\*') >/dev/null 2>&1") == 0:
+            return True
+
+    return False
