@@ -2,6 +2,7 @@ import json
 import random
 from datetime import datetime
 from decimal import Decimal
+from unittest.mock import call
 
 import arrow
 import pytest
@@ -70,6 +71,7 @@ def mocker_init(mocker):
     mock_send_ir_signal = mocker.patch('states.auto.send_ir_signal')
     mocker.patch('states.auto.get_most_recent_message')
     mocker.patch('states.auto.write_log_to_sheet')
+    mocker.patch('time.sleep')
     return mock_send_ir_signal
 
 
@@ -422,7 +424,7 @@ class TestVer2:
         Auto.last_command = None
 
         mock_healthcheck.assert_called_once()
-        mock_time_sleep.assert_called_once_with(60 * 10)
+        mock_time_sleep.assert_has_calls([call(10), call(10), call(60 * 10)])
         assert payload == {}
 
         mocker.resetall()
@@ -440,7 +442,7 @@ class TestVer2:
         Auto.last_command = None
 
         mock_healthcheck.assert_called_once()
-        mock_time_sleep.assert_not_called()
+        mock_time_sleep.assert_has_calls([call(10), call(10)])
         assert payload == {'command': 'auto', 'param': None}
         assert auto.nex(payload) == Auto
 

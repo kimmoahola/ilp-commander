@@ -11,7 +11,7 @@ from dateutil import tz
 
 import config
 from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_temp_from_sheet, \
-    median, get_url, time_str, write_log_to_sheet, TempTs, Forecast, decimal_round
+    median, get_url, time_str, write_log_to_sheet, TempTs, Forecast, decimal_round, have_valid_time
 from states import State
 
 
@@ -502,6 +502,9 @@ class Auto(State):
 
     @staticmethod
     def version_2(last_command):
+        valid_time = have_valid_time()
+        logger.info('have_valid_time: %s', valid_time)
+        extra_info = ['have_valid_time: %s' % valid_time]
         f_temps, f_ts = Temperatures.get_temp([receive_yr_no_forecast], max_ts_diff=48 * 60)
         if f_temps and f_ts:
             forecast = Forecast(temps=[TempTs(temp, ts) for temp, ts in f_temps], ts=f_ts)
@@ -510,7 +513,7 @@ class Auto(State):
         logger.debug('Forecast %s', forecast)
         Auto.min_forecast_temp = receive_yr_no_forecast_min_temperature(forecast)
         logger.info('Forecast min temperature: %s', Auto.min_forecast_temp)
-        extra_info = ['Forecast min temperature: %s' % decimal_round(Auto.min_forecast_temp)]
+        extra_info.append('Forecast min temperature: %s' % decimal_round(Auto.min_forecast_temp))
 
         if forecast and forecast.temps:
             mean_forecast = decimal_round(mean(f.temp for f in forecast.temps))
