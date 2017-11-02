@@ -502,9 +502,10 @@ class Auto(State):
 
     @staticmethod
     def version_2(last_command):
+        extra_info = []
         valid_time = have_valid_time()
-        logger.info('have_valid_time: %s', valid_time)
-        extra_info = ['have_valid_time: %s' % valid_time]
+        Auto.add_extra_info(extra_info, 'have_valid_time: %s' % valid_time)
+
         f_temps, f_ts = Temperatures.get_temp([receive_yr_no_forecast], max_ts_diff=48 * 60)
         if f_temps and f_ts:
             forecast = Forecast(temps=[TempTs(temp, ts) for temp, ts in f_temps], ts=f_ts)
@@ -512,37 +513,31 @@ class Auto(State):
             forecast = None
         logger.debug('Forecast %s', forecast)
         Auto.min_forecast_temp = receive_yr_no_forecast_min_temperature(forecast)
-        logger.info('Forecast min temperature: %s', Auto.min_forecast_temp)
-        extra_info.append('Forecast min temperature: %s' % decimal_round(Auto.min_forecast_temp))
+        Auto.add_extra_info(extra_info, 'Forecast min temperature: %s' % decimal_round(Auto.min_forecast_temp))
 
         if forecast and forecast.temps:
             mean_forecast = decimal_round(mean(f.temp for f in forecast.temps))
-            logger.info('Forecast mean: %s', mean_forecast)
-            extra_info.append('Forecast mean: %s' % mean_forecast)
+            Auto.add_extra_info(extra_info, 'Forecast mean: %s' % mean_forecast)
 
         outside_temp, outside_ts = Temperatures.get_temp([
             receive_ulkoilma_temperature, receive_fmi_temperature, receive_open_weather_map_temperature])
-        logger.info('Outside temperature: %s', outside_temp)
-        extra_info.append('Outside temperature: %s' % outside_temp)
+        Auto.add_extra_info(extra_info, 'Outside temperature: %s' % outside_temp)
 
         if outside_temp is None:
             outside_ts = arrow.now()
             if Auto.min_forecast_temp is not None:
                 outside_temp = Auto.min_forecast_temp
-                logger.info('Using forecast: %s', Auto.min_forecast_temp)
-                extra_info.append('Using forecast: %s' % Auto.min_forecast_temp)
+                Auto.add_extra_info(extra_info, 'Using forecast: %s' % Auto.min_forecast_temp)
             else:
                 outside_temp = Decimal(-10)
-                logger.info('Using predefined outside temperature: %s', outside_temp)
-                extra_info.append('Using predefined outside temperature: %s' % outside_temp)
+                Auto.add_extra_info(extra_info, 'Using predefined outside temperature: %s' % outside_temp)
 
-        target_inside_temp = target_inside_temperature(TempTs(temp=outside_temp, ts=outside_ts), config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
-        logger.info('Target inside temperature: %s', target_inside_temp)
-        extra_info.append('Target inside temperature: %s' % decimal_round(target_inside_temp))
+        target_inside_temp = target_inside_temperature(TempTs(temp=outside_temp, ts=outside_ts),
+                                                       config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
+        Auto.add_extra_info(extra_info, 'Target inside temperature: %s' % decimal_round(target_inside_temp, 2))
 
         inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
-        logger.info('Inside temperature: %s', inside_temp)
-        extra_info.append('Inside temperature: %s' % inside_temp)
+        Auto.add_extra_info(extra_info, 'Inside temperature: %s' % inside_temp)
 
         if inside_temp is not None and inside_temp > config.ALLOWED_MINIMUM_INSIDE_TEMP:
             buffer = get_buffer(inside_temp, TempTs(temp=outside_temp, ts=outside_ts), config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
@@ -551,8 +546,8 @@ class Auto(State):
                     ts = time_str(arrow.utcnow().shift(hours=float(buffer)))
                 else:
                     ts = ''
-                logger.info('Current buffer: %s h (%s) to temp %s C', buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP)
-                extra_info.append('Current buffer: %s h (%s) to temp %s C' % (buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
+                Auto.add_extra_info(extra_info, 'Current buffer: %s h (%s) to temp %s C' % (
+                    buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
 
         target_inside_temp_hysteresis_high = target_inside_temperature(
             TempTs(temp=outside_temp, ts=outside_ts), target_inside_temp, forecast, Auto.hysteresis_time_hours)
@@ -563,23 +558,10 @@ class Auto(State):
         else:
             target_inside_temp = target_inside_temp_hysteresis_low
 
-        logger.info('Hysteresis: %s', target_inside_temp_hysteresis_high)
-        extra_info.append('Hysteresis: %s' % decimal_round(target_inside_temp_hysteresis_high))
+        Auto.add_extra_info(extra_info, 'Hysteresis: %s' % decimal_round(target_inside_temp_hysteresis_high))
 
-        if target_inside_temp_hysteresis_low > config.MINIMUM_INSIDE_TEMP:
-            # keep ILP always turned on
-            next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
-        else:
-            if inside_temp is not None:
-                if outside_temp < target_inside_temp_hysteresis_low and inside_temp < target_inside_temp:
-                    next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_high)
-                else:
-                    next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
-            else:
-                if outside_temp < target_inside_temp_hysteresis_low:
-                    next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
-                else:
-                    next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
+        next_command = Auto.version_2_next_command(inside_temp, outside_temp, target_inside_temp,
+                                                   target_inside_temp_hysteresis_low)
 
         if inside_temp is not None and next_command == Commands.off:
             time_until_heat = get_buffer(inside_temp, TempTs(temp=outside_temp, ts=outside_ts), target_inside_temp, forecast)
@@ -588,10 +570,34 @@ class Auto(State):
                     ts = time_str(arrow.utcnow().shift(hours=float(time_until_heat)))
                 else:
                     ts = ''
-                logger.info('Current time_until_heat: %s h (%s) to temp %s C', time_until_heat, ts, target_inside_temp)
-                extra_info.append('Current time_until_heat: %s h (%s) to temp %s C' % (time_until_heat, ts, decimal_round(target_inside_temp)))
+                Auto.add_extra_info(extra_info, 'Current time_until_heat: %s h (%s) to temp %s C' % (
+                    time_until_heat, ts, decimal_round(target_inside_temp)))
 
         return next_command, extra_info
+
+    @staticmethod
+    def version_2_next_command(inside_temp, outside_temp, target_inside_temp, target_inside_temp_hysteresis_low):
+        if target_inside_temp_hysteresis_low > config.MINIMUM_INSIDE_TEMP:
+            # keep ILP always turned on when the current buffer is config.COOLING_TIME_BUFFER or lower
+            next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
+        else:
+            if inside_temp is not None:
+                if outside_temp < target_inside_temp_hysteresis_low and inside_temp < target_inside_temp:
+                    next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
+                else:
+                    next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
+            else:
+                if outside_temp < target_inside_temp_hysteresis_low:
+                    next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
+                else:
+                    next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
+
+        return next_command
+
+    @staticmethod
+    def add_extra_info(extra_info, message):
+        logger.info(message)
+        extra_info.append(message)
 
     def nex(self, payload):
         from states.manual import Manual
