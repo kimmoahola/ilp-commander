@@ -364,7 +364,7 @@ def decimal_round(value, decimals=1):
 def log_temp_info():
     from states.auto import Auto, target_inside_temperature, get_buffer
 
-    for outside_temp in [-20, -15, -10, -5, 0, 5]:
+    for outside_temp in range(-30, int(config.MINIMUM_INSIDE_TEMP + 1), 1):
         outside_temp_ts = TempTs(Decimal(outside_temp), arrow.now())
 
         target_inside_temp = target_inside_temperature(
@@ -374,9 +374,23 @@ def log_temp_info():
 
         buffer = get_buffer(target_inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
 
-        logger.info('Target inside %s (hysteresis %s) when outside is %s. Buffer %s h',
-                    decimal_round(target_inside_temp, 2), decimal_round(target_inside_temp_hysteresis_high, 2),
-                    outside_temp, buffer)
+        command = Auto.version_2_next_command(target_inside_temp - Decimal('0.01'), outside_temp, target_inside_temp,
+                                              target_inside_temp)
+
+        command2 = Auto.version_2_next_command(target_inside_temp_hysteresis_high + Decimal('0.01'),
+                                               outside_temp,
+                                               target_inside_temp_hysteresis_high,
+                                               target_inside_temp)
+
+        logger.info(
+            'Target inside %5.2f (hysteresis %5.2f) when outside is %5.1f. '
+            'Buffer %s h. -> %s until hysteresis reached: %s',
+            target_inside_temp,
+            target_inside_temp_hysteresis_high,
+            outside_temp,
+            buffer,
+            command,
+            command2)
 
 
 def have_valid_time():
