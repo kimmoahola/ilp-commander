@@ -252,6 +252,13 @@ def target_inside_temperature(outside_temp_ts: TempTs, allowed_min_inside_temp: 
     # from pprint import pprint
     # pprint(forecast)
 
+    try:
+        cooling_time_buffer_hours = float(cooling_time_buffer)
+    except:
+        cooling_time_buffer_hours = float(cooling_time_buffer(outside_temp_ts.temp))
+
+    # logger.info('Buffer is %s h at %s C', cooling_time_buffer_hours, outside_temp_ts.temp)
+
     valid_forecast = []
 
     if outside_temp_ts:
@@ -273,7 +280,7 @@ def target_inside_temperature(outside_temp_ts: TempTs, allowed_min_inside_temp: 
     # pprint(reversed_forecast[-1].ts)
 
     iteration_inside_temp = allowed_min_inside_temp
-    iteration_ts = arrow.now().shift(hours=float(cooling_time_buffer))
+    iteration_ts = arrow.now().shift(hours=cooling_time_buffer_hours)
     # print('iteration_ts', iteration_ts)
 
     # if reversed_forecast[0].ts < iteration_ts:
@@ -577,20 +584,20 @@ class Auto(State):
 
     @staticmethod
     def version_2_next_command(inside_temp, outside_temp, target_inside_temp, target_inside_temp_hysteresis_low):
-        if target_inside_temp_hysteresis_low > config.MINIMUM_INSIDE_TEMP:
-            # keep ILP always turned on when the current buffer is config.COOLING_TIME_BUFFER or lower
-            next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
-        else:
-            if inside_temp is not None:
-                if outside_temp < target_inside_temp_hysteresis_low and inside_temp < target_inside_temp:
-                    next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
-                else:
-                    next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
+        # if target_inside_temp_hysteresis_low > config.MINIMUM_INSIDE_TEMP:
+        #     # keep ILP always turned on when the current buffer is config.COOLING_TIME_BUFFER or lower
+        #     next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
+        # else:
+        if inside_temp is not None:
+            if outside_temp < target_inside_temp_hysteresis_low and inside_temp < target_inside_temp:
+                next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
             else:
-                if outside_temp < target_inside_temp_hysteresis_low:
-                    next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
-                else:
-                    next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
+                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
+        else:
+            if outside_temp < target_inside_temp_hysteresis_low:
+                next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
+            else:
+                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
 
         return next_command
 
