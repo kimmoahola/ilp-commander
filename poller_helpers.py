@@ -364,33 +364,37 @@ def decimal_round(value, decimals=1):
 def log_temp_info():
     from states.auto import Auto, target_inside_temperature, get_buffer
 
-    for outside_temp in range(-30, int(config.MINIMUM_INSIDE_TEMP + 1), 1):
+    seen_off = None
+    warn_off = False
+
+    for outside_temp in range(-30, int(config.MINIMUM_INSIDE_TEMP + 2), 1):
         outside_temp_ts = TempTs(Decimal(outside_temp), arrow.now())
 
         target_inside_temp = target_inside_temperature(
             outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
-        target_inside_temp_hysteresis_high = target_inside_temperature(
-            outside_temp_ts, target_inside_temp, None, Auto.hysteresis_time_hours)
 
         buffer = get_buffer(target_inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
 
-        command = Auto.version_2_next_command(target_inside_temp - Decimal('0.01'), outside_temp, target_inside_temp,
-                                              target_inside_temp)
+        command1 = Auto.version_2_next_command(target_inside_temp - Decimal('0.01'), outside_temp, target_inside_temp)
+        command2 = Auto.version_2_next_command(target_inside_temp + Decimal('0.01'), outside_temp, target_inside_temp)
 
-        command2 = Auto.version_2_next_command(target_inside_temp_hysteresis_high + Decimal('0.01'),
-                                               outside_temp,
-                                               target_inside_temp_hysteresis_high,
-                                               target_inside_temp)
+        if seen_off and command2 != Commands.off:
+            warn_off = True
+
+        if seen_off is None and command2 == Commands.off:
+            seen_off = outside_temp
 
         logger.info(
-            'Target inside %5.2f (hysteresis %5.2f) when outside is %5.1f. '
-            'Buffer %s h. -> %s until hysteresis reached: %s',
+            'Target inside is %5.2f when outside is %5.1f. '
+            'Buffer %s h. -> %s until target temp reached: %s',
             target_inside_temp,
-            target_inside_temp_hysteresis_high,
             outside_temp,
             buffer,
-            command,
+            command1,
             command2)
+
+    if warn_off:
+        logger.warning('Will turn off when outside is %5.1f.', seen_off)
 
 
 def have_valid_time():

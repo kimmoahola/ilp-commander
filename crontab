@@ -5,3 +5,5 @@
 35 * * * * pi curl -fs --retry 8 `cd ~/ilp-commander/ && python -c 'import config; print(config.HEALTHCHECK_URL_CRON)'` > /dev/null
 
 12 10 * * * pi grep ERROR ~/ilp-commander/poller.log ~/ilp-commander/poller.log.1 | egrep -o 'ERROR.*' | cut -c-200 | sort | uniq -c | awk '$1>5' | mail -E -s "ilp-commander log errors" pi
+
+12 10 * * * pi grep WARNING ~/ilp-commander/poller.log ~/ilp-commander/poller.log.1 | egrep -o 'WARNING.*' | cut -c-200 | sort | uniq -c | awk '$1>0' | mail -E -s "ilp-commander log warnings" pi
