@@ -439,9 +439,6 @@ def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside
 
 
 class Auto(State):
-
-    hysteresis_time_hours = Decimal(6)
-
     min_forecast_temp = None
     last_command = None
     last_command_send_time = time.time()
@@ -450,7 +447,7 @@ class Auto(State):
         if version == 1:
             next_command, extra_info = self.version_1()
         elif version == 2:
-            next_command, extra_info = self.version_2(Auto.last_command)
+            next_command, extra_info = self.version_2(Auto.last_command, Auto.last_command_send_time)
         else:
             raise ValueError(version)
 
@@ -508,38 +505,15 @@ class Auto(State):
         return next_command, extra_info
 
     @staticmethod
-    def version_2(last_command):
+    def version_2(last_command, last_command_send_time):
         extra_info = []
         valid_time = have_valid_time()
         Auto.add_extra_info(extra_info, 'have_valid_time: %s' % valid_time)
 
-        f_temps, f_ts = Temperatures.get_temp([receive_yr_no_forecast], max_ts_diff=48 * 60)
-        if f_temps and f_ts:
-            forecast = Forecast(temps=[TempTs(temp, ts) for temp, ts in f_temps], ts=f_ts)
-        else:
-            forecast = None
-        logger.debug('Forecast %s', forecast)
-        Auto.min_forecast_temp = receive_yr_no_forecast_min_temperature(forecast)
-        Auto.add_extra_info(extra_info, 'Forecast min temperature: %s' % decimal_round(Auto.min_forecast_temp))
+        forecast = Auto.get_forecast(extra_info)
+        outside_temp_ts = Auto.get_outside(extra_info)
 
-        if forecast and forecast.temps:
-            mean_forecast = decimal_round(mean(f.temp for f in forecast.temps))
-            Auto.add_extra_info(extra_info, 'Forecast mean: %s' % mean_forecast)
-
-        outside_temp, outside_ts = Temperatures.get_temp([
-            receive_ulkoilma_temperature, receive_fmi_temperature, receive_open_weather_map_temperature])
-        Auto.add_extra_info(extra_info, 'Outside temperature: %s' % outside_temp)
-
-        if outside_temp is None:
-            outside_ts = arrow.now()
-            if Auto.min_forecast_temp is not None:
-                outside_temp = Auto.min_forecast_temp
-                Auto.add_extra_info(extra_info, 'Using forecast: %s' % Auto.min_forecast_temp)
-            else:
-                outside_temp = Decimal(-10)
-                Auto.add_extra_info(extra_info, 'Using predefined outside temperature: %s' % outside_temp)
-
-        target_inside_temp = target_inside_temperature(TempTs(temp=outside_temp, ts=outside_ts),
+        target_inside_temp = target_inside_temperature(outside_temp_ts,
                                                        config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
         Auto.add_extra_info(extra_info, 'Target inside temperature: %s' % decimal_round(target_inside_temp, 2))
 
@@ -547,7 +521,7 @@ class Auto(State):
         Auto.add_extra_info(extra_info, 'Inside temperature: %s' % inside_temp)
 
         if inside_temp is not None and inside_temp > config.ALLOWED_MINIMUM_INSIDE_TEMP:
-            buffer = get_buffer(inside_temp, TempTs(temp=outside_temp, ts=outside_ts), config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
+            buffer = get_buffer(inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
             if buffer is not None:
                 if isinstance(buffer, (int, Decimal)):
                     ts = time_str(arrow.utcnow().shift(hours=float(buffer)))
@@ -556,22 +530,13 @@ class Auto(State):
                 Auto.add_extra_info(extra_info, 'Current buffer: %s h (%s) to temp %s C' % (
                     buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
 
-        target_inside_temp_hysteresis_high = target_inside_temperature(
-            TempTs(temp=outside_temp, ts=outside_ts), target_inside_temp, forecast, Auto.hysteresis_time_hours)
-        target_inside_temp_hysteresis_low = target_inside_temp
+        next_command = Auto.version_2_next_command(inside_temp, outside_temp_ts.temp, target_inside_temp)
 
-        if last_command and 'heat' in last_command:
-            target_inside_temp = target_inside_temp_hysteresis_high
-        else:
-            target_inside_temp = target_inside_temp_hysteresis_low
-
-        Auto.add_extra_info(extra_info, 'Hysteresis: %s' % decimal_round(target_inside_temp_hysteresis_high))
-
-        next_command = Auto.version_2_next_command(inside_temp, outside_temp, target_inside_temp,
-                                                   target_inside_temp_hysteresis_low)
+        # if last_command and 'heat' in last_command and next_command == 'off' and (time.time() - last_command_send_time) / 60.0 < 60:
+        #     next_command = last_command
 
         if inside_temp is not None and next_command == Commands.off:
-            time_until_heat = get_buffer(inside_temp, TempTs(temp=outside_temp, ts=outside_ts), target_inside_temp, forecast)
+            time_until_heat = get_buffer(inside_temp, outside_temp_ts, target_inside_temp, forecast)
             if time_until_heat is not None:
                 if isinstance(time_until_heat, (int, Decimal)):
                     ts = time_str(arrow.utcnow().shift(hours=float(time_until_heat)))
@@ -583,21 +548,48 @@ class Auto(State):
         return next_command, extra_info
 
     @staticmethod
-    def version_2_next_command(inside_temp, outside_temp, target_inside_temp, target_inside_temp_hysteresis_low):
-        # if target_inside_temp_hysteresis_low > config.MINIMUM_INSIDE_TEMP:
-        #     # keep ILP always turned on when the current buffer is config.COOLING_TIME_BUFFER or lower
-        #     next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
-        # else:
-        if inside_temp is not None:
-            if outside_temp < target_inside_temp_hysteresis_low and inside_temp < target_inside_temp:
-                next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
-            else:
-                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
+    def get_forecast(extra_info):
+        f_temps, f_ts = Temperatures.get_temp([receive_yr_no_forecast], max_ts_diff=48 * 60)
+        if f_temps and f_ts:
+            forecast = Forecast(temps=[TempTs(temp, ts) for temp, ts in f_temps], ts=f_ts)
         else:
-            if outside_temp < target_inside_temp_hysteresis_low:
-                next_command = Commands.find_command_just_above_temp(target_inside_temp_hysteresis_low)
+            forecast = None
+        logger.debug('Forecast %s', forecast)
+        Auto.min_forecast_temp = receive_yr_no_forecast_min_temperature(forecast)
+        Auto.add_extra_info(extra_info, 'Forecast min temperature: %s' % decimal_round(Auto.min_forecast_temp))
+        if forecast and forecast.temps:
+            mean_forecast = decimal_round(mean(f.temp for f in forecast.temps))
+            Auto.add_extra_info(extra_info, 'Forecast mean: %s' % mean_forecast)
+        return forecast
+
+    @staticmethod
+    def get_outside(extra_info):
+        outside_temp, outside_ts = Temperatures.get_temp([
+            receive_ulkoilma_temperature, receive_fmi_temperature, receive_open_weather_map_temperature])
+        Auto.add_extra_info(extra_info, 'Outside temperature: %s' % outside_temp)
+        if outside_temp is None:
+            outside_ts = arrow.now()
+            if Auto.min_forecast_temp is not None:
+                outside_temp = Auto.min_forecast_temp
+                Auto.add_extra_info(extra_info, 'Using forecast: %s' % Auto.min_forecast_temp)
             else:
-                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_hysteresis_low)
+                outside_temp = Decimal(-10)
+                Auto.add_extra_info(extra_info, 'Using predefined outside temperature: %s' % outside_temp)
+
+        return TempTs(temp=outside_temp, ts=outside_ts)
+
+    @staticmethod
+    def version_2_next_command(inside_temp, outside_temp, target_inside_temp):
+        if inside_temp is not None:
+            if outside_temp < target_inside_temp and inside_temp < target_inside_temp:
+                next_command = Commands.find_command_just_above_temp(target_inside_temp)
+            else:
+                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp)
+        else:
+            if outside_temp < target_inside_temp:
+                next_command = Commands.find_command_just_above_temp(target_inside_temp)
+            else:
+                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp)
 
         return next_command
 
