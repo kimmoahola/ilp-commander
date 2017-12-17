@@ -574,9 +574,13 @@ class Auto(State):
         f_temps, f_ts = Temperatures.get_temp([receive_yr_no_forecast], max_ts_diff=48 * 60)
         if f_temps and f_ts:
             forecast = Forecast(temps=[TempTs(temp, ts) for temp, ts in f_temps], ts=f_ts)
+            logger.debug('Forecast between %s %s %s',
+                         forecast.temps[0].ts,
+                         forecast.temps[-1].ts,
+                         ' '.join(str(t.temp) for t in forecast.temps))
         else:
             forecast = None
-        logger.debug('Forecast %s', forecast)
+            logger.debug('Forecast %s', forecast)
         mean_forecast = receive_yr_no_forecast_mean_temperature(forecast)
         Auto.add_extra_info(extra_info, 'Forecast mean: %s' % decimal_round(mean_forecast))
         return forecast, mean_forecast
