@@ -27,7 +27,6 @@ logger.setLevel(logging.DEBUG)
 logger.info('----- START -----')
 
 
-# TempTs = Tuple[Decimal, arrow.Arrow]
 TempTs = NamedTuple("TempTs", [('temp', Decimal), ('ts', arrow.Arrow)])
 Forecast = NamedTuple("Forecast", [('temps', List[TempTs]), ('ts', arrow.Arrow)])
 
@@ -109,7 +108,22 @@ class CommandLog(db.Entity):
         return arrow.get(self.ts).to(config.TIMEZONE)
 
 
+class IRSendLog(db.Entity):
+    command = orm.Required(str)
+
+    # Use str here because pony uses str() to convert datetime before insert.
+    # That puts datetime in wrong format to DB.
+    ts = orm.Required(str, default=lambda: arrow.utcnow().isoformat())
+
+    def ts_local(self):
+        return arrow.get(self.ts).to(config.TIMEZONE)
+
+
 with db.set_perms_for(CommandLog):
+    orm.perm('view', group='anybody')
+
+
+with db.set_perms_for(IRSendLog):
     orm.perm('view', group='anybody')
 
 
@@ -184,6 +198,9 @@ def actually_send_ir_signal(command: str):
         raise
     except Exception as e:
         logger.exception(e)
+    else:
+        with orm.db_session:
+            IRSendLog(command=command)
 
 
 def timing(f):

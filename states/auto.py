@@ -530,7 +530,7 @@ class Auto(State):
                                                        forecast,
                                                        extra_info=extra_info)
 
-        Auto.add_extra_info(extra_info, 'Target inside temperature: %s' % decimal_round(target_inside_temp, 2))
+        Auto.add_extra_info(extra_info, 'Target inside temperature: %s' % decimal_round(target_inside_temp, 1))
 
         if last_command and last_command != Commands.off:
             target_inside_temp += Decimal('0.1')
@@ -554,7 +554,7 @@ class Auto(State):
 
         next_command = Auto.version_2_next_command(inside_temp, outside_temp_ts.temp, target_inside_temp)
 
-        # if last_command and 'heat' in last_command and next_command == 'off' and (time.time() - last_command_send_time) / 60.0 < 60:
+        # if last_command and 'heat' in last_command and next_command == Commands.off and (time.time() - last_command_send_time) / 60.0 < 60:
         #     next_command = last_command
 
         if inside_temp is not None and next_command == Commands.off:
