@@ -192,6 +192,8 @@ def receive_yr_no_forecast():
                 in d['weatherdata']['forecast']['tabular']['time']
             ]
 
+            # print('\n'.join(reversed(list(str(t.temp) for t in temp))))
+
             # temp = min(Decimal(t['temperature']['@value']) for t in time_elements)
             # min_datetime = arrow.get(min(t['@from'] for t in time_elements)).replace(tzinfo=timezone)
             # max_datetime = arrow.get(max(t['@to'] for t in time_elements)).replace(tzinfo=timezone)
@@ -203,9 +205,9 @@ def receive_yr_no_forecast():
     return temp, ts
 
 
-def receive_yr_no_forecast_min_temperature(forecast: Forecast):
+def receive_yr_no_forecast_mean_temperature(forecast: Forecast):
     if forecast and forecast.temps:
-        return min(t.temp for t in forecast.temps)
+        return mean(t.temp for t in forecast.temps)
     else:
         return None
 
@@ -244,9 +246,11 @@ class Temperatures:
         return median(temperatures)
 
 
-def target_inside_temperature(outside_temp_ts: TempTs, allowed_min_inside_temp: Decimal,
+def target_inside_temperature(outside_temp_ts: TempTs,
+                              allowed_min_inside_temp: Decimal,
                               forecast: Union[Forecast, None],
-                              cooling_time_buffer=config.COOLING_TIME_BUFFER) -> Decimal:
+                              cooling_time_buffer=config.COOLING_TIME_BUFFER,
+                              extra_info=None) -> Decimal:
     # print('target_inside_temperature', '-' * 50)
 
     # from pprint import pprint
@@ -258,6 +262,10 @@ def target_inside_temperature(outside_temp_ts: TempTs, allowed_min_inside_temp: 
         cooling_time_buffer_hours = float(cooling_time_buffer(outside_temp_ts.temp))
 
     # logger.info('Buffer is %s h at %s C', cooling_time_buffer_hours, outside_temp_ts.temp)
+
+    if extra_info is not None:
+        Auto.add_extra_info(extra_info, 'Buffer is %s h at %s C' % (
+            decimal_round(cooling_time_buffer_hours), decimal_round(outside_temp_ts.temp)))
 
     valid_forecast = []
 
@@ -439,7 +447,6 @@ def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside
 
 
 class Auto(State):
-    min_forecast_temp = None
     last_command = None
     last_command_send_time = time.time()
 
@@ -510,18 +517,25 @@ class Auto(State):
         valid_time = have_valid_time()
         Auto.add_extra_info(extra_info, 'have_valid_time: %s' % valid_time)
 
-        forecast = Auto.get_forecast(extra_info)
-        outside_temp_ts = Auto.get_outside(extra_info)
+        forecast, mean_forecast = Auto.get_forecast(extra_info)
+        outside_temp_ts = Auto.get_outside(extra_info, forecast)
 
-        target_inside_temp = target_inside_temperature(outside_temp_ts,
-                                                       config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
+        if mean_forecast:
+            outside_for_target_calc = TempTs(mean_forecast, arrow.now())
+        else:
+            outside_for_target_calc = outside_temp_ts
+
+        target_inside_temp = target_inside_temperature(outside_for_target_calc,
+                                                       config.ALLOWED_MINIMUM_INSIDE_TEMP,
+                                                       forecast,
+                                                       extra_info=extra_info)
+
         Auto.add_extra_info(extra_info, 'Target inside temperature: %s' % decimal_round(target_inside_temp, 2))
 
-        if last_command:
-            if last_command == Commands.off:
-                target_inside_temp -= Decimal('0.1')
-            else:
-                target_inside_temp += Decimal('0.1')
+        if last_command and last_command != Commands.off:
+            target_inside_temp += Decimal('0.1')
+        else:
+            target_inside_temp -= Decimal('0.1')
 
         Auto.add_extra_info(extra_info, 'Hysteresis: %s' % decimal_round(target_inside_temp))
 
@@ -563,23 +577,21 @@ class Auto(State):
         else:
             forecast = None
         logger.debug('Forecast %s', forecast)
-        Auto.min_forecast_temp = receive_yr_no_forecast_min_temperature(forecast)
-        Auto.add_extra_info(extra_info, 'Forecast min temperature: %s' % decimal_round(Auto.min_forecast_temp))
-        if forecast and forecast.temps:
-            mean_forecast = decimal_round(mean(f.temp for f in forecast.temps))
-            Auto.add_extra_info(extra_info, 'Forecast mean: %s' % mean_forecast)
-        return forecast
+        mean_forecast = receive_yr_no_forecast_mean_temperature(forecast)
+        Auto.add_extra_info(extra_info, 'Forecast mean: %s' % decimal_round(mean_forecast))
+        return forecast, mean_forecast
 
     @staticmethod
-    def get_outside(extra_info):
+    def get_outside(extra_info, mean_forecast):
         outside_temp, outside_ts = Temperatures.get_temp([
             receive_ulkoilma_temperature, receive_fmi_temperature, receive_open_weather_map_temperature])
         Auto.add_extra_info(extra_info, 'Outside temperature: %s' % outside_temp)
         if outside_temp is None:
             outside_ts = arrow.now()
-            if Auto.min_forecast_temp is not None:
-                outside_temp = Auto.min_forecast_temp
-                Auto.add_extra_info(extra_info, 'Using forecast: %s' % Auto.min_forecast_temp)
+            if mean_forecast is not None:
+                outside_temp = mean_forecast
+                Auto.add_extra_info(extra_info,
+                                    'Using mean forecast as outside temp: %s' % decimal_round(mean_forecast))
             else:
                 outside_temp = Decimal(-10)
                 Auto.add_extra_info(extra_info, 'Using predefined outside temperature: %s' % outside_temp)

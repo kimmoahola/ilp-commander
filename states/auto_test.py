@@ -404,11 +404,9 @@ class TestVer2:
 
     @staticmethod
     def run_auto_ver2():
-        Auto.min_forecast_temp = None
         Auto.last_command = None
         auto = Auto()
         auto.run({}, version=2)
-        Auto.min_forecast_temp = None
         Auto.last_command = None
 
     @pytest.mark.skipif(has_invalid_sheet(),
