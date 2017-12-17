@@ -517,6 +517,14 @@ class Auto(State):
                                                        config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
         Auto.add_extra_info(extra_info, 'Target inside temperature: %s' % decimal_round(target_inside_temp, 2))
 
+        if last_command:
+            if last_command == Commands.off:
+                target_inside_temp -= Decimal('0.1')
+            else:
+                target_inside_temp += Decimal('0.1')
+
+        Auto.add_extra_info(extra_info, 'Hysteresis: %s' % decimal_round(target_inside_temp))
+
         inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
         Auto.add_extra_info(extra_info, 'Inside temperature: %s' % inside_temp)
 
