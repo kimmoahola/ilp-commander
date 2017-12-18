@@ -517,7 +517,7 @@ class Auto(State):
         valid_time = have_valid_time()
         Auto.add_extra_info(extra_info, 'have_valid_time: %s' % valid_time)
 
-        forecast, mean_forecast = Auto.get_forecast(extra_info)
+        forecast, mean_forecast = Auto.get_forecast(extra_info, valid_time)
         outside_temp_ts = Auto.get_outside(extra_info, forecast)
 
         if mean_forecast:
@@ -532,12 +532,11 @@ class Auto(State):
 
         Auto.add_extra_info(extra_info, 'Target inside temperature: %s' % decimal_round(target_inside_temp, 1))
 
-        if last_command and last_command != Commands.off:
-            target_inside_temp += Decimal('0.1')
-        else:
-            target_inside_temp -= Decimal('0.1')
+        hysteresis = Auto.hysteresis(outside_for_target_calc, target_inside_temp)
+        Auto.add_extra_info(extra_info, 'Hysteresis: %s' % decimal_round(hysteresis))
 
-        Auto.add_extra_info(extra_info, 'Hysteresis: %s' % decimal_round(target_inside_temp))
+        if last_command and last_command != Commands.off:
+            target_inside_temp = hysteresis
 
         inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
         Auto.add_extra_info(extra_info, 'Inside temperature: %s' % inside_temp)
@@ -557,23 +556,31 @@ class Auto(State):
         # if last_command and 'heat' in last_command and next_command == Commands.off and (time.time() - last_command_send_time) / 60.0 < 60:
         #     next_command = last_command
 
-        if inside_temp is not None and next_command == Commands.off:
-            time_until_heat = get_buffer(inside_temp, outside_temp_ts, target_inside_temp, forecast)
-            if time_until_heat is not None:
-                if isinstance(time_until_heat, (int, Decimal)):
-                    ts = time_str(arrow.utcnow().shift(hours=float(time_until_heat)))
-                else:
-                    ts = ''
-                Auto.add_extra_info(extra_info, 'Current time_until_heat: %s h (%s) to temp %s C' % (
-                    time_until_heat, ts, decimal_round(target_inside_temp)))
+        # if inside_temp is not None and next_command == Commands.off:
+        #     time_until_heat = get_buffer(inside_temp, outside_temp_ts, target_inside_temp, forecast)
+        #     if time_until_heat is not None:
+        #         if isinstance(time_until_heat, (int, Decimal)):
+        #             ts = time_str(arrow.utcnow().shift(hours=float(time_until_heat)))
+        #         else:
+        #             ts = ''
+        #         Auto.add_extra_info(extra_info, 'Current time_until_heat: %s h (%s) to temp %s C' % (
+        #             time_until_heat, ts, decimal_round(target_inside_temp)))
 
         return next_command, extra_info
 
     @staticmethod
-    def get_forecast(extra_info):
+    def hysteresis(outside_for_target_calc, target_inside_temp):
+        temp_diff = target_inside_temp - outside_for_target_calc.temp
+        if temp_diff > 0:
+            return target_inside_temp + config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * temp_diff * 2
+        return target_inside_temp
+
+    @staticmethod
+    def get_forecast(extra_info, valid_time):
         f_temps, f_ts = Temperatures.get_temp([receive_yr_no_forecast], max_ts_diff=48 * 60)
         if f_temps and f_ts:
-            forecast = Forecast(temps=[TempTs(temp, ts) for temp, ts in f_temps], ts=f_ts)
+            now = arrow.now()
+            forecast = Forecast(temps=[TempTs(temp, ts) for temp, ts in f_temps if not valid_time or ts > now], ts=f_ts)
             logger.debug('Forecast between %s %s %s',
                          forecast.temps[0].ts,
                          forecast.temps[-1].ts,
