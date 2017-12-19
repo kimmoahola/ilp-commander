@@ -535,11 +535,12 @@ class Auto(State):
         hysteresis = Auto.hysteresis(outside_for_target_calc, target_inside_temp)
         Auto.add_extra_info(extra_info, 'Hysteresis: %s' % decimal_round(hysteresis))
 
-        if last_command and last_command != Commands.off:
-            target_inside_temp = hysteresis
-
         inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
         Auto.add_extra_info(extra_info, 'Inside temperature: %s' % inside_temp)
+
+        if inside_temp is not None:
+            target_diff = target_inside_temp - inside_temp
+            Auto.add_extra_info(extra_info, 'Inside vs target diff: %s' % target_diff)
 
         if inside_temp is not None and inside_temp > config.ALLOWED_MINIMUM_INSIDE_TEMP:
             buffer = get_buffer(inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
@@ -550,6 +551,9 @@ class Auto(State):
                     ts = ''
                 Auto.add_extra_info(extra_info, 'Current buffer: %s h (%s) to temp %s C' % (
                     buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
+
+        if last_command and last_command != Commands.off:
+            target_inside_temp = hysteresis
 
         next_command = Auto.version_2_next_command(inside_temp, outside_temp_ts.temp, target_inside_temp)
 
