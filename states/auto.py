@@ -441,7 +441,7 @@ def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside
         # TODO: kun buffer on oikeasti nolla, niin palauta nolla
         buffer = 'inf'
     elif isinstance(buffer, Decimal):
-        buffer = decimal_round(buffer)
+        buffer = decimal_round(buffer, 0)
 
     return buffer
 

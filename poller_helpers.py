@@ -373,7 +373,10 @@ def decimal_round(value, decimals=1):
     if not isinstance(value, Decimal):
         value = Decimal(value)
 
-    rounder = '.' + ('0' * (decimals - 1)) + '1'
+    if decimals > 0:
+        rounder = '.' + ('0' * (decimals - 1)) + '1'
+    else:
+        rounder = '1'
 
     return value.quantize(Decimal(rounder), rounding=ROUND_HALF_UP)
 
