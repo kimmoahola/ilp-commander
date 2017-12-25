@@ -397,8 +397,15 @@ def log_temp_info():
 
         hysteresis = Auto.hysteresis(outside_temp_ts, target_inside_temp)
 
-        command1 = Auto.version_2_next_command(hysteresis - Decimal('0.01'), outside_temp, hysteresis)
-        command2 = Auto.version_2_next_command(target_inside_temp + Decimal('0.01'), outside_temp, target_inside_temp)
+        target_inside_temp_correction_below_target = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp)
+        target_inside_temp_correction_above_target = Auto.target_temp_correction(target_inside_temp, outside_temp_ts.temp)
+
+        command1 = Auto.version_2_next_command(
+            hysteresis - Decimal('0.01'), outside_temp, hysteresis, target_inside_temp_correction_below_target)
+        command2 = Auto.version_2_next_command(
+            target_inside_temp + Decimal('0.01'), outside_temp, hysteresis, target_inside_temp_correction_above_target)
+        command3 = Auto.version_2_next_command(
+            target_inside_temp + Decimal('0.01'), outside_temp, target_inside_temp, target_inside_temp_correction_above_target)
 
         if seen_off and command2 != Commands.off:
             warn_off = True
@@ -408,13 +415,14 @@ def log_temp_info():
 
         logger.info(
             'Target inside is %5.2f (hysteresis %5.2f) when outside is %5.1f. '
-            'Buffer %s h. When below target temp -> %s until hysteresis reached -> %s',
+            'Buffer %s h. When below target temp -> %s until target temp reached -> %s until hysteresis reached %s',
             target_inside_temp,
             hysteresis,
             outside_temp,
             buffer,
             command1,
-            command2)
+            command2,
+            command3)
 
     if warn_off:
         logger.warning('Will turn off when outside is %5.1f.', seen_off)

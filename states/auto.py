@@ -539,8 +539,10 @@ class Auto(State):
         Auto.add_extra_info(extra_info, 'Inside temperature: %s' % inside_temp)
 
         if inside_temp is not None:
-            target_diff = target_inside_temp - inside_temp
-            Auto.add_extra_info(extra_info, 'Inside vs target diff: %s' % target_diff)
+            target_diff = inside_temp - target_inside_temp
+            Auto.add_extra_info(extra_info, 'Inside vs target diff: %s' % decimal_round(target_diff, 2))
+            if target_diff < -1:
+                logger.warning('Inside vs target diff is less than -1: %s' % decimal_round(target_diff, 2))
 
         if inside_temp is not None and inside_temp > config.ALLOWED_MINIMUM_INSIDE_TEMP:
             buffer = get_buffer(inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
@@ -553,9 +555,15 @@ class Auto(State):
                     buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
 
         if last_command and last_command != Commands.off:
-            target_inside_temp = hysteresis
+            target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp)
+        else:
+            target_inside_temp_correction = Auto.target_temp_correction(target_inside_temp, outside_temp_ts.temp)
 
-        next_command = Auto.version_2_next_command(inside_temp, outside_temp_ts.temp, target_inside_temp)
+        Auto.add_extra_info(
+            extra_info, 'target_inside_temp_correction %s' % decimal_round(target_inside_temp_correction, 2))
+
+        next_command = Auto.version_2_next_command(
+            inside_temp, outside_temp_ts.temp, target_inside_temp, target_inside_temp_correction)
 
         # if last_command and 'heat' in last_command and next_command == Commands.off and (time.time() - last_command_send_time) / 60.0 < 60:
         #     next_command = last_command
@@ -614,19 +622,25 @@ class Auto(State):
         return TempTs(temp=outside_temp, ts=outside_ts)
 
     @staticmethod
-    def version_2_next_command(inside_temp, outside_temp, target_inside_temp):
+    def version_2_next_command(inside_temp, outside_temp, target_inside_temp, target_inside_temp_correction):
         if inside_temp is not None:
             if outside_temp < target_inside_temp and inside_temp < target_inside_temp:
-                next_command = Commands.find_command_just_above_temp(target_inside_temp)
+                next_command = Commands.find_command_just_above_temp(target_inside_temp_correction)
             else:
                 next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp)
         else:
             if outside_temp < target_inside_temp:
-                next_command = Commands.find_command_just_above_temp(target_inside_temp)
+                next_command = Commands.find_command_just_above_temp(target_inside_temp_correction)
             else:
                 next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp)
 
         return next_command
+
+    @staticmethod
+    def target_temp_correction(target_inside_temp, outside_temp):
+        inside_outside_diff_correction = target_inside_temp + config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * abs(
+            outside_temp - target_inside_temp) * 16
+        return inside_outside_diff_correction
 
     @staticmethod
     def add_extra_info(extra_info, message):
