@@ -192,11 +192,22 @@ def receive_yr_no_forecast():
                 in d['weatherdata']['forecast']['tabular']['time']
             ]
 
-            # print('\n'.join(reversed(list(str(t.temp) for t in temp))))
+            try:
+                result = get_url('https://www.yr.no/place/{place}/forecast.xml'.format(place=config.YR_NO_LOCATION))
+            except Exception as e:
+                logger.exception(e)
+            else:
+                if result.status_code != 200:
+                    logger.error('%d: %s' % (result.status_code, result.content))
+                else:
+                    d = xmltodict.parse(result.content)
+                    timezone = d['weatherdata']['location']['timezone']['@id']
 
-            # temp = min(Decimal(t['temperature']['@value']) for t in time_elements)
-            # min_datetime = arrow.get(min(t['@from'] for t in time_elements)).replace(tzinfo=timezone)
-            # max_datetime = arrow.get(max(t['@to'] for t in time_elements)).replace(tzinfo=timezone)
+                    for t in d['weatherdata']['forecast']['tabular']['time']:
+                        current_forecast_end_ts = arrow.get(t['@to']).replace(tzinfo=timezone)
+                        while current_forecast_end_ts > temp[-1].ts:
+                            temp.append(TempTs(Decimal(t['temperature']['@value']), temp[-1].ts.shift(hours=1)))
+
             ts = arrow.now()
 
             logger.info('Forecast: %s', temp)
@@ -207,7 +218,7 @@ def receive_yr_no_forecast():
 
 def receive_yr_no_forecast_mean_temperature(forecast: Forecast):
     if forecast and forecast.temps:
-        return mean(t.temp for t in forecast.temps)
+        return mean(t.temp for t in forecast.temps[:48])
     else:
         return None
 
@@ -450,13 +461,8 @@ class Auto(State):
     last_command = None
     last_command_send_time = time.time()
 
-    def run(self, payload, version=2):
-        if version == 1:
-            next_command, extra_info = self.version_1()
-        elif version == 2:
-            next_command, extra_info = self.version_2(Auto.last_command, Auto.last_command_send_time)
-        else:
-            raise ValueError(version)
+    def run(self, payload):
+        next_command, extra_info = self.process(Auto.last_command)
 
         if Auto.last_command is not None:
             logger.debug('Last auto command sent %d minutes ago', (time.time() - Auto.last_command_send_time) / 60.0)
@@ -475,44 +481,7 @@ class Auto(State):
         return get_most_recent_message(once=True)
 
     @staticmethod
-    def version_1():
-        inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
-        logger.info('Inside temperature: %s', inside_temp)
-        extra_info = ['Inside temperature: %s' % inside_temp]
-
-        if inside_temp is None or inside_temp < 8:
-
-            outside_temp = Temperatures.get_temp([
-                receive_ulkoilma_temperature, receive_fmi_temperature, receive_open_weather_map_temperature])[0]
-
-            extra_info.append('Outside temperature: %s' % outside_temp)
-
-            if outside_temp is not None:
-                logger.info('Outside temperature: %.1f', outside_temp)
-
-                if outside_temp > 0:
-                    next_command = Commands.off
-                elif 0 >= outside_temp > -15:
-                    next_command = Commands.heat8
-                elif -15 >= outside_temp > -20:
-                    next_command = Commands.heat10
-                elif -20 >= outside_temp > -25:
-                    next_command = Commands.heat16
-                else:
-                    next_command = Commands.heat20
-
-            else:
-                next_command = Commands.heat16  # Don't know the temperature so heat up just in case
-                logger.error('Got no temperatures at all. Setting %s', next_command)
-                extra_info.append('Got no temperatures at all.')
-
-        else:
-            next_command = Commands.off  # No need to heat
-
-        return next_command, extra_info
-
-    @staticmethod
-    def version_2(last_command, last_command_send_time):
+    def process(last_command):
         extra_info = []
         valid_time = have_valid_time()
         Auto.add_extra_info(extra_info, 'have_valid_time: %s' % valid_time)
@@ -555,12 +524,17 @@ class Auto(State):
                     buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
 
         if last_command and last_command != Commands.off:
-            target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp)
+            if inside_temp < target_inside_temp:
+                target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp)
+            else:
+                target_inside_temp_correction = Auto.target_temp_correction(target_inside_temp, outside_temp_ts.temp)
+
+            target_inside_temp = hysteresis
         else:
             target_inside_temp_correction = Auto.target_temp_correction(target_inside_temp, outside_temp_ts.temp)
 
         Auto.add_extra_info(
-            extra_info, 'target_inside_temp_correction %s' % decimal_round(target_inside_temp_correction, 2))
+            extra_info, 'target_inside_temp_correction: %s' % decimal_round(target_inside_temp_correction, 2))
 
         next_command = Auto.version_2_next_command(
             inside_temp, outside_temp_ts.temp, target_inside_temp, target_inside_temp_correction)
