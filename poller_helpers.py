@@ -11,6 +11,7 @@ from subprocess import Popen, PIPE
 from typing import NamedTuple, List
 
 import arrow
+import itertools
 import pygsheets
 import requests
 from pony import orm
@@ -349,21 +350,51 @@ def get_temp_from_sheet(sheet_index):
 
 
 def median(data):
-    data = sorted(data, key=lambda r: r[0])
-    n = len(data)
 
-    if n == 0:
-        temp = None
-        ts = None
-    elif n % 2 == 1:
-        temp, ts = data[n // 2]
+    is_list_of_temps = all(d is None or isinstance(d[0], Decimal) and isinstance(d[1], arrow.Arrow) for d in data)
+
+    if not is_list_of_temps:
+        list_of_temps = make_tempts_lists_start_same(data)
+
+        temp = [
+            median(d)
+            for d
+            in itertools.zip_longest(*list_of_temps)
+        ]
+        ts = temp[0][1]
     else:
-        i = n // 2
-        temp = (data[i - 1][0] + data[i][0]) / 2
-        secs = abs((data[i - 1][1] - data[i][1]).total_seconds() / 2)
-        ts = data[i - 1][1].shift(seconds=secs)
+        data = filter(lambda x: x is not None, data)
+        data = sorted(data, key=lambda r: r[0])
+        n = len(data)
+
+        if n == 0:
+            temp = None
+            ts = None
+        elif n % 2 == 1:
+            temp, ts = data[n // 2]
+        else:
+            i = n // 2
+            temp = (data[i - 1][0] + data[i][0]) / 2
+            secs = abs((data[i - 1][1] - data[i][1]).total_seconds() / 2)
+            ts = data[i - 1][1].shift(seconds=secs)
 
     return temp, ts
+
+
+def list_items_equal(lst):
+    return lst[1:] == lst[:-1]
+
+
+def make_tempts_lists_start_same(data):
+    list_of_temps = list(list(zip(*data))[0])
+    list_of_first_timestamps = [l[0][1] for l in list_of_temps]
+
+    while not list_items_equal(list_of_first_timestamps):
+        list_index_to_delete_from = min(enumerate(list_of_temps), key=lambda x: x[1][0][1])[0]
+        del list_of_temps[list_index_to_delete_from][0]
+        list_of_first_timestamps = [l[0][1] for l in list_of_temps]
+
+    return list_of_temps
 
 
 def decimal_round(value, decimals=1):
