@@ -209,14 +209,66 @@ def receive_yr_no_forecast():
                             temp.append(TempTs(Decimal(t['temperature']['@value']), temp[-1].ts.shift(hours=1)))
 
             ts = arrow.now()
+            log_forecast('receive_yr_no_forecast', temp)
 
-            logger.info('Forecast: %s', temp)
-
-    logger.info('temp:%s ts:%s', temp, ts)
     return temp, ts
 
 
-def receive_yr_no_forecast_mean_temperature(forecast: Forecast):
+@timing
+@caching(cache_name='fmi_forecast')
+def receive_fmi_forecast():
+    temp, ts = None, None
+
+    try:
+        endtime = arrow.now().shift(hours=63).to('UTC').format('YYYY-MM-DDTHH:mm:ss') + 'Z'
+        url = 'http://data.fmi.fi/fmi-apikey/{key}/wfs?request=getFeature&' \
+                          'storedquery_id=fmi::forecast::harmonie::surface::point::simple&' \
+                          'place={place}&parameters=temperature&endtime={endtime}'.format(key=config.FMI_KEY,
+                                                                                          place=config.FMI_LOCATION,
+                                                                                          endtime=endtime)
+        print(url)
+        result = get_url(
+            url)
+    except Exception as e:
+        logger.exception(e)
+    else:
+        if result.status_code != 200:
+            logger.error('%d: %s' % (result.status_code, result.content))
+        else:
+            try:
+                wfs_member = xmltodict.parse(result.content).get('wfs:FeatureCollection', {}).get('wfs:member')
+
+                temp = [
+                    TempTs(
+                        Decimal(t['BsWfs:BsWfsElement']['BsWfs:ParameterValue']),
+                        arrow.get(t['BsWfs:BsWfsElement']['BsWfs:Time']).to(config.TIMEZONE)
+                    )
+                    for t
+                    in wfs_member
+                    if t['BsWfs:BsWfsElement']['BsWfs:ParameterValue'] != 'NaN'
+                ]
+
+                ts = arrow.now()
+                log_forecast('receive_fmi_forecast', temp)
+
+            except (KeyError, TypeError):
+                temp, ts = None, None
+
+    return temp, ts
+
+
+def log_forecast(name, temp):
+    temps = [t.temp for t in temp]
+    if temps:
+        forecast_hours = (temp[-1].ts - temp[0].ts).total_seconds() / 3600.0
+        logger.info('Forecast %s between %s %s (%s h) %s (mean %s) (mean 48h %s)',
+                    name, temp[0].ts, temp[-1].ts, forecast_hours, ' '.join(map(str, temps)), decimal_round(mean(temps)),
+                    decimal_round(mean(temps[:48])))
+    else:
+        logger.info('No forecast from %s')
+
+
+def forecast_mean_temperature(forecast: Forecast):
     if forecast and forecast.temps:
         return mean(t.temp for t in forecast.temps[:48])
     else:
@@ -563,18 +615,15 @@ class Auto(State):
 
     @staticmethod
     def get_forecast(extra_info, valid_time):
-        f_temps, f_ts = Temperatures.get_temp([receive_yr_no_forecast], max_ts_diff=48 * 60)
+        f_temps, f_ts = Temperatures.get_temp([receive_fmi_forecast, receive_yr_no_forecast], max_ts_diff=48 * 60)
         if f_temps and f_ts:
             now = arrow.now()
             forecast = Forecast(temps=[TempTs(temp, ts) for temp, ts in f_temps if not valid_time or ts > now], ts=f_ts)
-            logger.debug('Forecast between %s %s %s',
-                         forecast.temps[0].ts,
-                         forecast.temps[-1].ts,
-                         ' '.join(str(t.temp) for t in forecast.temps))
+            log_forecast('get_forecast', forecast.temps)
         else:
             forecast = None
             logger.debug('Forecast %s', forecast)
-        mean_forecast = receive_yr_no_forecast_mean_temperature(forecast)
+        mean_forecast = forecast_mean_temperature(forecast)
         Auto.add_extra_info(extra_info, 'Forecast mean: %s' % decimal_round(mean_forecast))
         return forecast, mean_forecast
 
