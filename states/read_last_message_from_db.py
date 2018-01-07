@@ -1,3 +1,6 @@
+import json
+from json import JSONDecodeError
+
 from pony import orm
 
 from poller_helpers import CommandLog
@@ -9,7 +12,12 @@ class ReadLastMessageFromDB(State):
         with orm.db_session:
             first = orm.select(c for c in CommandLog).order_by(orm.desc(CommandLog.ts)).first()
             if first:
-                return first.to_dict()
+                as_dict = first.to_dict()
+                try:
+                    as_dict['param'] = json.loads(as_dict['param'])
+                except JSONDecodeError:
+                    pass
+                return as_dict
             else:
                 return {}
 

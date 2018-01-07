@@ -9,7 +9,7 @@ class Manual(State):
         if payload['command'] == 'turn off':
             command = Commands.off
         elif payload['command'] == 'set temp':
-            command = getattr(Commands, 'heat%d' % int(payload['param']))
+            command = getattr(Commands, 'heat%d' % int(payload['param']['temp']))
 
         if command:
             send_ir_signal(command)

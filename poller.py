@@ -1,5 +1,5 @@
 # coding=utf-8
-
+import config
 from poller_helpers import logger, log_temp_info
 from states.read_last_message_from_db import ReadLastMessageFromDB
 
@@ -8,7 +8,7 @@ def run():
     state_klass = ReadLastMessageFromDB
     payload = None
 
-    log_temp_info()
+    log_temp_info(config.MINIMUM_INSIDE_TEMP)
 
     while True:
         state = state_klass()
