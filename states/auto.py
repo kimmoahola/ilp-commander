@@ -11,7 +11,7 @@ from dateutil import tz
 
 import config
 from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_temp_from_sheet, \
-    median, get_url, time_str, write_log_to_sheet, TempTs, Forecast, decimal_round, have_valid_time
+    median, get_url, time_str, write_log_to_sheet, TempTs, Forecast, decimal_round, have_valid_time, log_temp_info
 from states import State
 
 
@@ -312,6 +312,7 @@ class Temperatures:
 
 def target_inside_temperature(outside_temp_ts: TempTs,
                               allowed_min_inside_temp: Decimal,
+                              minimum_inside_temp,
                               forecast: Union[Forecast, None],
                               cooling_time_buffer=config.COOLING_TIME_BUFFER,
                               extra_info=None) -> Decimal:
@@ -407,7 +408,7 @@ def target_inside_temperature(outside_temp_ts: TempTs,
 
     # print('iteration_ts', iteration_ts)
     # print('target_inside_temperature', iteration_inside_temp)
-    return max(iteration_inside_temp, config.MINIMUM_INSIDE_TEMP)
+    return max(iteration_inside_temp, minimum_inside_temp)
 
 
 def cooling_time_buffer_resolved(cooling_time_buffer, outside_temp):
@@ -518,7 +519,13 @@ class Auto(State):
     last_command_send_time = time.time()
 
     def run(self, payload):
-        next_command, extra_info = self.process(Auto.last_command)
+        if payload['param'] and payload['param'].get('min_inside_temp') is not None:
+            minimum_inside_temp = Decimal(payload['param'].get('min_inside_temp'))
+            log_temp_info(minimum_inside_temp)
+        else:
+            minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
+
+        next_command, extra_info = self.process(Auto.last_command, minimum_inside_temp)
 
         if Auto.last_command is not None:
             logger.debug('Last auto command sent %d minutes ago', (time.time() - Auto.last_command_send_time) / 60.0)
@@ -537,7 +544,7 @@ class Auto(State):
         return get_most_recent_message(once=True)
 
     @staticmethod
-    def process(last_command):
+    def process(last_command, minimum_inside_temp):
         extra_info = []
         valid_time = have_valid_time()
         Auto.add_extra_info(extra_info, 'have_valid_time: %s' % valid_time)
@@ -552,6 +559,7 @@ class Auto(State):
 
         target_inside_temp = target_inside_temperature(outside_for_target_calc,
                                                        config.ALLOWED_MINIMUM_INSIDE_TEMP,
+                                                       minimum_inside_temp,
                                                        forecast,
                                                        extra_info=extra_info)
 

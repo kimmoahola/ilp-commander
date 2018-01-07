@@ -239,8 +239,10 @@ def get_most_recent_message(once=False):
             param = message_dict['param']
             if param is None:
                 param = ''
+            else:
+                param = json.dumps(param)
 
-            CommandLog(command=message_dict['command'], param=str(param))
+            CommandLog(command=message_dict['command'], param=param)
     else:
         message_dict = {}
 
@@ -412,23 +414,23 @@ def decimal_round(value, decimals=1):
     return value.quantize(Decimal(rounder), rounding=ROUND_HALF_UP)
 
 
-def log_temp_info():
+def log_temp_info(minimum_inside_temp):
     from states.auto import Auto, target_inside_temperature, get_buffer
 
     seen_off = None
     warn_off = False
 
-    for outside_temp in range(-30, int(config.MINIMUM_INSIDE_TEMP + 2), 1):
+    for outside_temp in range(-30, int(minimum_inside_temp + 2), 1):
         outside_temp_ts = TempTs(Decimal(outside_temp), arrow.now())
 
         target_inside_temp = target_inside_temperature(
-            outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
+            outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, minimum_inside_temp, None)
 
         buffer = get_buffer(target_inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
 
         hysteresis = Auto.hysteresis(outside_temp_ts.temp, target_inside_temp)
 
-        target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp)
+        target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp,  hysteresis - Decimal('0.01'))
 
         command1 = Auto.version_2_next_command(
             hysteresis - Decimal('0.01'), outside_temp, hysteresis, target_inside_temp_correction)
