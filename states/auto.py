@@ -226,7 +226,6 @@ def receive_fmi_forecast():
                           'place={place}&parameters=temperature&endtime={endtime}'.format(key=config.FMI_KEY,
                                                                                           place=config.FMI_LOCATION,
                                                                                           endtime=endtime)
-        print(url)
         result = get_url(
             url)
     except Exception as e:
@@ -270,7 +269,9 @@ def log_forecast(name, temp):
 
 def forecast_mean_temperature(forecast: Forecast):
     if forecast and forecast.temps:
-        return mean(t.temp for t in forecast.temps[:48])
+        cooling_time_buffer_hours = int(cooling_time_buffer_resolved(
+            config.COOLING_TIME_BUFFER, config.ALLOWED_MINIMUM_INSIDE_TEMP))
+        return mean(t.temp for t in forecast.temps[:cooling_time_buffer_hours])
     else:
         return None
 
@@ -319,11 +320,7 @@ def target_inside_temperature(outside_temp_ts: TempTs,
     # from pprint import pprint
     # pprint(forecast)
 
-    try:
-        cooling_time_buffer_hours = float(cooling_time_buffer)
-    except:
-        cooling_time_buffer_hours = float(cooling_time_buffer(outside_temp_ts.temp))
-
+    cooling_time_buffer_hours = cooling_time_buffer_resolved(cooling_time_buffer, outside_temp_ts.temp)
     # logger.info('Buffer is %s h at %s C', cooling_time_buffer_hours, outside_temp_ts.temp)
 
     if extra_info is not None:
@@ -411,6 +408,13 @@ def target_inside_temperature(outside_temp_ts: TempTs,
     # print('iteration_ts', iteration_ts)
     # print('target_inside_temperature', iteration_inside_temp)
     return max(iteration_inside_temp, config.MINIMUM_INSIDE_TEMP)
+
+
+def cooling_time_buffer_resolved(cooling_time_buffer, outside_temp):
+    try:
+        return float(cooling_time_buffer)
+    except:
+        return float(cooling_time_buffer(outside_temp))
 
 
 def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside_temp: Decimal,
