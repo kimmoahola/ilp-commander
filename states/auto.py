@@ -580,14 +580,9 @@ class Auto(State):
                     buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
 
         if last_command and last_command != Commands.off:
-            if inside_temp < target_inside_temp:
-                target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp)
-            else:
-                target_inside_temp_correction = Auto.target_temp_correction(target_inside_temp, outside_temp_ts.temp)
-
             target_inside_temp = hysteresis
-        else:
-            target_inside_temp_correction = Auto.target_temp_correction(target_inside_temp, outside_temp_ts.temp)
+
+        target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp)
 
         Auto.add_extra_info(
             extra_info, 'target_inside_temp_correction: %s' % decimal_round(target_inside_temp_correction, 2))
@@ -654,20 +649,20 @@ class Auto(State):
             if outside_temp < target_inside_temp and inside_temp < target_inside_temp:
                 next_command = Commands.find_command_just_above_temp(target_inside_temp_correction)
             else:
-                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp)
+                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_correction)
         else:
             if outside_temp < target_inside_temp:
                 next_command = Commands.find_command_just_above_temp(target_inside_temp_correction)
             else:
-                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp)
+                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_correction)
 
         return next_command
 
     @staticmethod
     def target_temp_correction(target_inside_temp, outside_temp):
-        inside_outside_diff_correction = target_inside_temp + config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * abs(
-            outside_temp - target_inside_temp) * 16
-        return inside_outside_diff_correction
+        inside_outside_diff_correction = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * \
+                                         (target_inside_temp - outside_temp) * 6
+        return target_inside_temp + max(inside_outside_diff_correction, 0)
 
     @staticmethod
     def add_extra_info(extra_info, message):
