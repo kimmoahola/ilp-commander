@@ -606,11 +606,9 @@ class Auto(State):
         return next_command, extra_info
 
     @staticmethod
-    def hysteresis(outside_for_target_calc, target_inside_temp):
-        temp_diff = target_inside_temp - outside_for_target_calc.temp
-        if temp_diff > 0:
-            return target_inside_temp + config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * temp_diff * 2
-        return target_inside_temp
+    def hysteresis(outside_temp, target_inside_temp):
+        hysteresis_add = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * (target_inside_temp - outside_temp) * 2
+        return target_inside_temp + max(hysteresis_add, 0)
 
     @staticmethod
     def get_forecast(extra_info, valid_time):
