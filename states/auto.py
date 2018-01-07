@@ -519,8 +519,8 @@ class Auto(State):
     last_command_send_time = time.time()
 
     def run(self, payload):
-        if payload['param'] and payload['param'].get('min_inside_temp') is not None:
-            minimum_inside_temp = Decimal(payload['param'].get('min_inside_temp'))
+        if payload.get('param') and payload.get('param').get('min_inside_temp') is not None:
+            minimum_inside_temp = Decimal(payload.get('param').get('min_inside_temp'))
             log_temp_info(minimum_inside_temp)
         else:
             minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
