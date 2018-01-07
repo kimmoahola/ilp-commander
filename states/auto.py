@@ -590,7 +590,7 @@ class Auto(State):
         if last_command and last_command != Commands.off:
             target_inside_temp = hysteresis
 
-        target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp)
+        target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp, inside_temp)
 
         Auto.add_extra_info(
             extra_info, 'target_inside_temp_correction: %s' % decimal_round(target_inside_temp_correction, 2))
@@ -665,10 +665,16 @@ class Auto(State):
         return next_command
 
     @staticmethod
-    def target_temp_correction(target_inside_temp, outside_temp):
+    def target_temp_correction(target_inside_temp, outside_temp, inside_temp):
         inside_outside_diff_correction = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * \
                                          (target_inside_temp - outside_temp) * 6
-        return target_inside_temp + max(inside_outside_diff_correction, 0)
+
+        if inside_temp is None:
+            diff_correction = 0
+        else:
+            diff_correction = max(target_inside_temp - inside_temp, 0)
+
+        return target_inside_temp + max(inside_outside_diff_correction, 0) + diff_correction
 
     @staticmethod
     def add_extra_info(extra_info, message):
