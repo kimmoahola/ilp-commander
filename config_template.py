@@ -31,6 +31,10 @@ CACHE_TIMES = {
         'if_ok': 60,
         'if_failed': 60 * 48,
     },
+    'fmi_forecast': {
+        'if_ok': 60,
+        'if_failed': 60 * 48,
+    },
     'open_weather_map': {
         'if_ok': 50,
         'if_failed': 120,
