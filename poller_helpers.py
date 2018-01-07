@@ -430,7 +430,7 @@ def log_temp_info(minimum_inside_temp):
 
         hysteresis = Auto.hysteresis(outside_temp_ts.temp, target_inside_temp)
 
-        target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp,  hysteresis)
+        target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp, 0)
 
         command1 = Auto.version_2_next_command(
             hysteresis - Decimal('0.01'), outside_temp, hysteresis, target_inside_temp_correction)
