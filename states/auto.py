@@ -557,7 +557,7 @@ class Auto(State):
 
         Auto.add_extra_info(extra_info, 'Target inside temperature: %s' % decimal_round(target_inside_temp, 1))
 
-        hysteresis = Auto.hysteresis(outside_for_target_calc, target_inside_temp)
+        hysteresis = Auto.hysteresis(outside_temp_ts.temp, target_inside_temp)
         Auto.add_extra_info(extra_info, 'Hysteresis: %s' % decimal_round(hysteresis))
 
         inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
