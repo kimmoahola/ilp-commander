@@ -458,12 +458,14 @@ def log_temp_info(minimum_inside_temp):
         logger.warning('Will turn off when outside is %5.1f.', seen_off)
 
 
-def have_valid_time():
+def have_valid_time(wait_time=30):
 
-    for i in range(3):
+    sleep_time = 10
+
+    for i in range(max(int(wait_time / sleep_time), 1)):
         if i > 0:
             # Sleep only between reads
-            time.sleep(10)
+            time.sleep(sleep_time)
 
         if os.system("(ntpq -pn | egrep '^\*') >/dev/null 2>&1") == 0:
             return True
