@@ -1,10 +1,12 @@
 # coding=utf-8
 import config
-from poller_helpers import logger, log_temp_info
+from poller_helpers import logger, log_temp_info, have_valid_time
 from states.read_last_message_from_db import ReadLastMessageFromDB
 
 
 def run():
+    have_valid_time(5 * 60)
+
     state_klass = ReadLastMessageFromDB
     payload = None
 
