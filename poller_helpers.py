@@ -230,6 +230,7 @@ def get_most_recent_message(once=False):
             time.sleep(sleep_time)
 
         if once:
+            most_recent_message = get_message_from_sheet()
             break
 
     if most_recent_message:
