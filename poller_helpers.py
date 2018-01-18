@@ -120,11 +120,20 @@ class IRSendLog(db.Entity):
         return arrow.get(self.ts).to(config.TIMEZONE)
 
 
+class SavedState(db.Entity):
+    name = orm.Required(str)
+    json = orm.Required(str)
+
+
 with db.set_perms_for(CommandLog):
     orm.perm('view', group='anybody')
 
 
 with db.set_perms_for(IRSendLog):
+    orm.perm('view', group='anybody')
+
+
+with db.set_perms_for(SavedState):
     orm.perm('view', group='anybody')
 
 

@@ -1,17 +1,21 @@
 # coding=utf-8
+import json
 import time
 from decimal import Decimal
 from functools import wraps
+from json import JSONDecodeError
 from statistics import mean
 from typing import Union
 
 import arrow
 import xmltodict
 from dateutil import tz
+from pony import orm
 
 import config
 from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_temp_from_sheet, \
-    median, get_url, time_str, write_log_to_sheet, TempTs, Forecast, decimal_round, have_valid_time, log_temp_info
+    median, get_url, time_str, write_log_to_sheet, TempTs, Forecast, decimal_round, have_valid_time, log_temp_info, \
+    SavedState
 from states import State
 
 
@@ -519,17 +523,15 @@ class Controller:
         self.kp = kp
         self.ki = ki
         self.i_limit = i_limit
-        self.integral = Decimal(3) / self.ki
-        # self.integral = 0
+        self.integral = 0
         self.current_time = None
-
-        self.output = 0
 
     def reset(self):
-        self.integral = Decimal(3) / self.ki
-        # self.integral = 0
+        self.integral = 0
         self.current_time = None
-        self.output = 0
+
+    def is_reset(self):
+        return self.current_time is None
 
     def update(self, error):
         p_term = self.kp * error
@@ -564,11 +566,12 @@ class Controller:
 class Auto(State):
     last_command = None
     last_command_send_time = time.time()
+    minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
+
     controller = Controller(
         Decimal(2),
         Decimal(1) / Decimal(3600),
         Decimal(20) / (Decimal(1) / Decimal(3600)))
-    minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
 
     @staticmethod
     def clear():
@@ -576,9 +579,31 @@ class Auto(State):
         Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
         Auto.controller.reset()
 
-    def run(self, payload):
-        print('payload', payload)
+    @staticmethod
+    def save_state():
+        data = json.dumps({'integral': str(Auto.controller.integral)})
+        with orm.db_session:
+            saved_state = orm.select(c for c in SavedState).where(name='Auto.controller').first()
+            if saved_state:
+                saved_state.set(json=data)
+            else:
+                SavedState(name='Auto.controller', json=data)
 
+    @staticmethod
+    def load_state():
+        if Auto.controller.is_reset():
+            with orm.db_session:
+                saved_state = orm.select(c for c in SavedState).where(name='Auto.controller').first()
+                if saved_state:
+                    as_dict = saved_state.to_dict()
+                    try:
+                        as_dict['json'] = json.loads(as_dict['json'])
+                    except JSONDecodeError:
+                        pass
+                    else:
+                        Auto.controller.integral = Decimal(as_dict['json']['integral'])
+
+    def run(self, payload):
         if payload:
             if payload.get('param') and payload.get('param').get('min_inside_temp') is not None:
                 Auto.minimum_inside_temp = Decimal(payload.get('param').get('min_inside_temp'))
@@ -587,7 +612,8 @@ class Auto(State):
                 Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
 
         minimum_inside_temp = Auto.minimum_inside_temp
-        print('minimum_inside_temp', minimum_inside_temp)
+
+        self.load_state()
 
         next_command, extra_info = self.process(Auto.last_command, minimum_inside_temp)
 
@@ -603,6 +629,8 @@ class Auto(State):
             send_ir_signal(next_command, extra_info=extra_info)
 
         write_log_to_sheet(next_command, extra_info=extra_info)
+
+        self.save_state()
 
         return get_most_recent_message(once=True)
 
