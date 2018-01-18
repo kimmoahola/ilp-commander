@@ -4,7 +4,7 @@ from decimal import Decimal
 from freezegun import freeze_time
 
 import config
-from poller_helpers import median, send_ir_signal, Commands
+from poller_helpers import median, send_ir_signal, Commands, log_temp_info, TempTs
 
 
 def test_median():
@@ -15,6 +15,27 @@ def test_median():
 
     assert result_temp == Decimal(11)
     assert result_ts == ts1.shift(minutes=1)
+
+
+def test_median_list_of_temps():
+    ts1 = arrow.now()
+    ts2 = ts1.shift(minutes=2)
+    ts3 = ts1.shift(minutes=-2)
+
+    list1 = (
+        [TempTs(Decimal(10), ts1), TempTs(Decimal(12), ts2)],
+        ts3
+    )
+
+    list2 = (
+        [TempTs(Decimal(9), ts1), TempTs(Decimal(11), ts2)],
+        ts3
+    )
+
+    result_temp, result_ts = median([list1, list2])
+
+    assert result_temp == [(Decimal('9.5'), ts1), (Decimal('11.5'), ts2)]
+    assert result_ts == ts1
 
 
 def test_send_ir_signal_fail(mocker):
@@ -54,3 +75,7 @@ def test_command():
     assert Commands.find_command_at_or_just_below_temp(Decimal(8)) == Commands.heat8
     assert Commands.find_command_at_or_just_below_temp(Decimal(9)) == Commands.heat8
     assert Commands.find_command_at_or_just_below_temp(Decimal(31)) == Commands.heat30
+
+
+def test_log_temp_info():
+    log_temp_info(config.MINIMUM_INSIDE_TEMP)
