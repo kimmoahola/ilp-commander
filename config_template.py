@@ -41,9 +41,18 @@ CACHE_TIMES = {
     },
 }
 ALLOWED_MINIMUM_INSIDE_TEMP = Decimal(1)
-MINIMUM_INSIDE_TEMP = Decimal(6)
-COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF = Decimal('0.018')
-COOLING_TIME_BUFFER = 24  # hours
+MINIMUM_INSIDE_TEMP = Decimal('3.5')
+COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF = Decimal('0.015')
+
+
+def cooling_time_buffer_func(outside_temp):
+    a = Decimal('0.08')
+    b = 4
+    c = 68
+    return max(a * outside_temp * outside_temp + b * outside_temp + c, 20)  # hours
+
+
+COOLING_TIME_BUFFER = cooling_time_buffer_func  # hours
 TEMP_API_OUTSIDE = {
     'host_and_port': '192.168.1.36:8080',
     'table_name': 'ulkoilma',
