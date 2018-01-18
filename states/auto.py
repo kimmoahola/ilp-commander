@@ -107,7 +107,7 @@ def receive_ulkoilma_temperature():
 @timing
 @caching(cache_name='wc')
 def receive_wc_temperature():
-    temp, ts = get_temp_from_sheet(sheet_index=0)
+    temp, ts = get_temp_from_sheet(sheet_index=3)
 
     if ts is not None and temp is not None:
         ts = arrow.get(ts, 'DD.MM.YYYY klo HH:mm').replace(tzinfo=tz.gettz(config.TIMEZONE))
@@ -514,16 +514,80 @@ def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside
     return buffer
 
 
+class Controller:
+    def __init__(self, kp, ki, i_limit):
+        self.kp = kp
+        self.ki = ki
+        self.i_limit = i_limit
+        self.integral = Decimal(3) / self.ki
+        # self.integral = 0
+        self.current_time = None
+
+        self.output = 0
+
+    def reset(self):
+        self.integral = Decimal(3) / self.ki
+        # self.integral = 0
+        self.current_time = None
+        self.output = 0
+
+    def update(self, error):
+        p_term = self.kp * error
+
+        new_time = time.time()
+
+        if self.current_time is not None:
+            delta_time = Decimal(new_time - self.current_time)
+            logger.debug('controller delta_time %.4f', delta_time)
+            self.integral += error * delta_time
+
+        self.current_time = new_time
+
+        if self.integral > self.i_limit:
+            self.integral = self.i_limit
+            logger.debug('controller integral high limit')
+        elif self.integral < 0:
+            self.integral = 0
+            logger.debug('controller integral low limit')
+
+        i_term = self.ki * self.integral
+
+        logger.debug('controller p_term %.4f', p_term)
+        logger.debug('controller i_term %.4f', i_term)
+
+        output = p_term + i_term
+
+        logger.debug('controller output %.4f', output)
+        return output
+
+
 class Auto(State):
     last_command = None
     last_command_send_time = time.time()
+    controller = Controller(
+        Decimal(2),
+        Decimal(1) / Decimal(3600),
+        Decimal(20) / (Decimal(1) / Decimal(3600)))
+    minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
+
+    @staticmethod
+    def clear():
+        Auto.last_command = None  # Clear last command so Auto sends command after Manual
+        Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
+        Auto.controller.reset()
 
     def run(self, payload):
-        if payload.get('param') and payload.get('param').get('min_inside_temp') is not None:
-            minimum_inside_temp = Decimal(payload.get('param').get('min_inside_temp'))
-            log_temp_info(minimum_inside_temp)
-        else:
-            minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
+        print('payload', payload)
+
+        if payload:
+            if payload.get('param') and payload.get('param').get('min_inside_temp') is not None:
+                Auto.minimum_inside_temp = Decimal(payload.get('param').get('min_inside_temp'))
+                log_temp_info(Auto.minimum_inside_temp)
+            else:
+                Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
+
+        minimum_inside_temp = Auto.minimum_inside_temp
+        print('minimum_inside_temp', minimum_inside_temp)
 
         next_command, extra_info = self.process(Auto.last_command, minimum_inside_temp)
 
@@ -531,8 +595,7 @@ class Auto(State):
             logger.debug('Last auto command sent %d minutes ago', (time.time() - Auto.last_command_send_time) / 60.0)
 
         # Send command every now and then even if command has not changed
-        force_send_command_time = 60 * 60 * 8
-        # force_send_command_time = 60 * 60 * 24 * 7  # 7 days
+        force_send_command_time = 60 * 60 * 24
 
         if Auto.last_command != next_command or time.time() - Auto.last_command_send_time > force_send_command_time:
             Auto.last_command = next_command
@@ -550,7 +613,7 @@ class Auto(State):
         Auto.add_extra_info(extra_info, 'have_valid_time: %s' % valid_time)
 
         forecast, mean_forecast = Auto.get_forecast(extra_info, valid_time)
-        outside_temp_ts = Auto.get_outside(extra_info, forecast)
+        outside_temp_ts = Auto.get_outside(extra_info, mean_forecast)
 
         if mean_forecast:
             outside_for_target_calc = TempTs(mean_forecast, arrow.now())
@@ -576,8 +639,6 @@ class Auto(State):
             Auto.add_extra_info(extra_info, 'Inside vs target diff: %s' % decimal_round(target_diff, 2))
             if target_diff < -1:
                 logger.warning('Inside vs target diff is less than -1: %s' % decimal_round(target_diff, 2))
-        else:
-            target_diff = 0
 
         if inside_temp is not None and inside_temp > config.ALLOWED_MINIMUM_INSIDE_TEMP:
             buffer = get_buffer(inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
@@ -589,29 +650,24 @@ class Auto(State):
                 Auto.add_extra_info(extra_info, 'Current buffer: %s h (%s) to temp %s C' % (
                     buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
 
-        if last_command and last_command != Commands.off:
-            target_inside_temp = hysteresis
+        if inside_temp is not None:
+            if target_inside_temp <= inside_temp <= hysteresis:
+                error = 0
+            else:
+                error = target_inside_temp - inside_temp
+        else:
+            error = 0
 
-        target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp, target_diff)
+        target_inside_temp_correction = target_inside_temp + Auto.controller.update(error)
 
         Auto.add_extra_info(
             extra_info, 'target_inside_temp_correction: %s' % decimal_round(target_inside_temp_correction, 2))
 
+        if last_command and last_command != Commands.off:
+            target_inside_temp = hysteresis
+
         next_command = Auto.version_2_next_command(
             inside_temp, outside_temp_ts.temp, target_inside_temp, target_inside_temp_correction)
-
-        # if last_command and 'heat' in last_command and next_command == Commands.off and (time.time() - last_command_send_time) / 60.0 < 60:
-        #     next_command = last_command
-
-        # if inside_temp is not None and next_command == Commands.off:
-        #     time_until_heat = get_buffer(inside_temp, outside_temp_ts, target_inside_temp, forecast)
-        #     if time_until_heat is not None:
-        #         if isinstance(time_until_heat, (int, Decimal)):
-        #             ts = time_str(arrow.utcnow().shift(hours=float(time_until_heat)))
-        #         else:
-        #             ts = ''
-        #         Auto.add_extra_info(extra_info, 'Current time_until_heat: %s h (%s) to temp %s C' % (
-        #             time_until_heat, ts, decimal_round(target_inside_temp)))
 
         return next_command, extra_info
 
@@ -624,8 +680,7 @@ class Auto(State):
     def get_forecast(extra_info, valid_time):
         f_temps, f_ts = Temperatures.get_temp([receive_fmi_forecast, receive_yr_no_forecast], max_ts_diff=48 * 60)
         if f_temps and f_ts:
-            now = arrow.now()
-            forecast = Forecast(temps=[TempTs(temp, ts) for temp, ts in f_temps if not valid_time or ts > now], ts=f_ts)
+            forecast = Auto.make_forecast(f_temps, f_ts, valid_time)
             log_forecast('get_forecast', forecast.temps)
         else:
             forecast = None
@@ -633,6 +688,11 @@ class Auto(State):
         mean_forecast = forecast_mean_temperature(forecast)
         Auto.add_extra_info(extra_info, 'Forecast mean: %s' % decimal_round(mean_forecast))
         return forecast, mean_forecast
+
+    @staticmethod
+    def make_forecast(temps, ts, valid_time):
+        now = arrow.now()
+        return Forecast(temps=[TempTs(temp, ts) for temp, ts in temps if not valid_time or ts > now], ts=ts)
 
     @staticmethod
     def get_outside(extra_info, mean_forecast):
@@ -667,15 +727,6 @@ class Auto(State):
         return next_command
 
     @staticmethod
-    def target_temp_correction(target_inside_temp, outside_temp, target_diff):
-        inside_outside_diff_correction = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * \
-                                         (target_inside_temp - outside_temp) * 6
-
-        diff_correction = max(-target_diff, 0)
-
-        return target_inside_temp + max(inside_outside_diff_correction, 0) + diff_correction
-
-    @staticmethod
     def add_extra_info(extra_info, message):
         logger.info(message)
         extra_info.append(message)
@@ -687,7 +738,7 @@ class Auto(State):
             if payload['command'] == 'auto':
                 return Auto
             else:
-                Auto.last_command = None  # Clear last command so Auto sends command after Manual
+                self.clear()
                 return Manual
         else:
             return Auto

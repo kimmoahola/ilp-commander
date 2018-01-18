@@ -314,7 +314,7 @@ def get_message_from_sheet():
 @timing
 def write_log_to_sheet(next_command, extra_info):
     sh = InitPygsheets.init_pygsheets()
-    cell = 'B1'
+    cell = 'C1'
 
     msg = '\n'.join([next_command, time_str()] + extra_info)
 
@@ -364,7 +364,10 @@ def median(data):
             for d
             in itertools.zip_longest(*list_of_temps)
         ]
-        ts = temp[0][1]
+        if temp:
+            ts = temp[0][1]
+        else:
+            ts = None
     else:
         data = filter(lambda x: x is not None, data)
         data = sorted(data, key=lambda r: r[0])
@@ -390,14 +393,21 @@ def list_items_equal(lst):
 
 def make_tempts_lists_start_same(data):
     list_of_temps = list(list(zip(*data))[0])
-    list_of_first_timestamps = [l[0][1] for l in list_of_temps]
+    list_of_first_timestamps = get_list_of_first_timestamps(list_of_temps)
 
     while not list_items_equal(list_of_first_timestamps):
         list_index_to_delete_from = min(enumerate(list_of_temps), key=lambda x: x[1][0][1])[0]
         del list_of_temps[list_index_to_delete_from][0]
-        list_of_first_timestamps = [l[0][1] for l in list_of_temps]
+        list_of_first_timestamps = get_list_of_first_timestamps(list_of_temps)
 
     return list_of_temps
+
+
+def get_list_of_first_timestamps(list_of_temps):
+    try:
+        return [l[0][1] for l in list_of_temps]
+    except IndexError:
+        return []
 
 
 def decimal_round(value, decimals=1):
@@ -431,7 +441,7 @@ def log_temp_info(minimum_inside_temp):
 
         hysteresis = Auto.hysteresis(outside_temp_ts.temp, target_inside_temp)
 
-        target_inside_temp_correction = Auto.target_temp_correction(hysteresis, outside_temp_ts.temp, 0)
+        target_inside_temp_correction = target_inside_temp
 
         command1 = Auto.version_2_next_command(
             hysteresis - Decimal('0.01'), outside_temp, hysteresis, target_inside_temp_correction)
@@ -445,11 +455,10 @@ def log_temp_info(minimum_inside_temp):
             seen_off = outside_temp
 
         logger.info(
-            'Target inside is %5.2f (hysteresis %5.2f, temp correction %5.2f) when outside is %5.1f. '
+            'Target inside is %5.2f (hysteresis %5.2f) when outside is %5.1f. '
             'Buffer %s h. When below target temp -> %s until hysteresis reached %s',
             target_inside_temp,
             hysteresis,
-            target_inside_temp_correction,
             outside_temp,
             buffer,
             command1,
