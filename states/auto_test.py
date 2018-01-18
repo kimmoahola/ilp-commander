@@ -350,7 +350,7 @@ class TestAuto:
         mock_outside(mocker, config.MINIMUM_INSIDE_TEMP - 1)
 
         self.run_auto_ver2()
-        assert_ir_call(mock_send_ir_signal, Commands.heat8)
+        assert_ir_call(mock_send_ir_signal, Commands.heat10)
 
     def test_auto_invalid_inside_low_outside(self, mocker):
         mock_send_ir_signal = mocker_init(mocker)
@@ -374,7 +374,7 @@ class TestAuto:
         mock_outside(mocker, None, config.MINIMUM_INSIDE_TEMP + 10)
 
         self.run_auto_ver2()
-        assert_ir_call(mock_send_ir_signal, Commands.off)
+        assert_ir_call(mock_send_ir_signal, Commands.heat8)
 
     def test_auto_invalid_outside_low_forecast(self, mocker):
         mock_send_ir_signal = mocker_init(mocker)
@@ -414,7 +414,7 @@ class TestAuto:
         mock_outside(mocker, config.MINIMUM_INSIDE_TEMP - 23)
 
         self.run_auto_ver2()
-        assert_ir_call(mock_send_ir_signal, Commands.heat28)
+        assert_ir_call(mock_send_ir_signal, Commands.heat30)
 
     def test_auto_warm_inside_and_outside(self, mocker):
         mock_send_ir_signal = mocker_init(mocker)
