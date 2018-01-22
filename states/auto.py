@@ -550,8 +550,8 @@ class Controller:
         if self.integral > self.i_limit:
             self.integral = self.i_limit
             logger.debug('controller integral high limit')
-        elif self.integral < 0:
-            self.integral = 0
+        elif self.integral < -self.i_limit:
+            self.integral = -self.i_limit
             logger.debug('controller integral low limit')
 
         i_term = self.ki * self.integral
@@ -685,6 +685,8 @@ class Auto(State):
         if inside_temp is not None:
             if inside_temp < target_inside_temp:
                 error = target_inside_temp - inside_temp
+                if Auto.controller.integral < 0:
+                    Auto.controller.integral = 0
             elif inside_temp > hysteresis:
                 error = hysteresis - inside_temp
             else:
