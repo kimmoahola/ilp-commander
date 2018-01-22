@@ -34,16 +34,16 @@ Forecast = NamedTuple("Forecast", [('temps', List[TempTs]), ('ts', arrow.Arrow)]
 
 class Commands:
     off = 'off'
-    heat8 = 'heat_8__swing_auto'
-    heat10 = 'heat_10__swing_auto'
-    heat16 = 'heat_16__fan_auto__swing_auto'
-    heat18 = 'heat_18__fan_auto__swing_auto'
-    heat20 = 'heat_20__fan_auto__swing_auto'
-    heat22 = 'heat_22__fan_auto__swing_auto'
-    heat24 = 'heat_24__fan_auto__swing_auto'
-    heat26 = 'heat_26__fan_auto__swing_auto'
-    heat28 = 'heat_28__fan_auto__swing_auto'
-    heat30 = 'heat_30__fan_auto__swing_auto'
+    heat8 = 'heat_8__swing_down'
+    heat10 = 'heat_10__swing_down'
+    heat16 = 'heat_16__fan_high__swing_down'
+    heat18 = 'heat_18__fan_high__swing_down'
+    heat20 = 'heat_20__fan_high__swing_down'
+    heat22 = 'heat_22__fan_high__swing_down'
+    heat24 = 'heat_24__fan_high__swing_down'
+    heat26 = 'heat_26__fan_high__swing_down'
+    heat28 = 'heat_28__fan_high__swing_down'
+    heat30 = 'heat_30__fan_high__swing_down'
 
     @staticmethod
     def find_command_just_above_temp(temp: Decimal):
