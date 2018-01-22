@@ -694,16 +694,23 @@ class Auto(State):
         else:
             error = 0
 
-        target_inside_temp_correction = target_inside_temp + Auto.controller.update(error)
+        controller_off_limit = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * (
+                target_inside_temp - outside_temp_ts.temp) * 6
 
-        Auto.add_extra_info(
-            extra_info, 'target_inside_temp_correction: %s' % decimal_round(target_inside_temp_correction, 2))
+        if inside_temp is not None and inside_temp > hysteresis + controller_off_limit:
+            next_command = Commands.off
+            Auto.hysteresis_going_up = False
+        else:
+            target_inside_temp_correction = target_inside_temp + Auto.controller.update(error)
 
-        if Auto.hysteresis_going_up:
-            target_inside_temp = hysteresis
+            Auto.add_extra_info(
+                extra_info, 'target_inside_temp_correction: %s' % decimal_round(target_inside_temp_correction, 2))
 
-        next_command, Auto.hysteresis_going_up = Auto.version_2_next_command(
-            inside_temp, outside_temp_ts.temp, target_inside_temp, target_inside_temp_correction)
+            if Auto.hysteresis_going_up:
+                target_inside_temp = hysteresis
+
+            next_command, Auto.hysteresis_going_up = Auto.version_2_next_command(
+                inside_temp, outside_temp_ts.temp, target_inside_temp, target_inside_temp_correction)
 
         return next_command, extra_info
 
