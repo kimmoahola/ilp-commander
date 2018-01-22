@@ -534,6 +534,8 @@ class Controller:
         return self.current_time is None
 
     def update(self, error):
+        logger.debug('controller error %.4f', error)
+
         p_term = self.kp * error
 
         new_time = time.time()
@@ -567,16 +569,18 @@ class Auto(State):
     last_command = None
     last_command_send_time = time.time()
     minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
+    hysteresis_going_up = False
 
     controller = Controller(
-        Decimal(2),
+        Decimal('1.3'),  # from target 4 to target 15, this adds (15-4) * 1.3 == 14.3 to the output
         Decimal(1) / Decimal(3600),
-        Decimal(20) / (Decimal(1) / Decimal(3600)))
+        Decimal(15) / (Decimal(1) / Decimal(3600)))
 
     @staticmethod
     def clear():
         Auto.last_command = None  # Clear last command so Auto sends command after Manual
         Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
+        Auto.hysteresis_going_up = False
         Auto.controller.reset()
 
     @staticmethod
@@ -679,10 +683,12 @@ class Auto(State):
                     buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
 
         if inside_temp is not None:
-            if target_inside_temp <= inside_temp <= hysteresis:
-                error = 0
-            else:
+            if inside_temp < target_inside_temp:
                 error = target_inside_temp - inside_temp
+            elif inside_temp > hysteresis:
+                error = hysteresis - inside_temp
+            else:
+                error = 0
         else:
             error = 0
 
@@ -691,10 +697,10 @@ class Auto(State):
         Auto.add_extra_info(
             extra_info, 'target_inside_temp_correction: %s' % decimal_round(target_inside_temp_correction, 2))
 
-        if last_command and last_command != Commands.off:
+        if Auto.hysteresis_going_up:
             target_inside_temp = hysteresis
 
-        next_command = Auto.version_2_next_command(
+        next_command, Auto.hysteresis_going_up = Auto.version_2_next_command(
             inside_temp, outside_temp_ts.temp, target_inside_temp, target_inside_temp_correction)
 
         return next_command, extra_info
@@ -743,16 +749,20 @@ class Auto(State):
     def version_2_next_command(inside_temp, outside_temp, target_inside_temp, target_inside_temp_correction):
         if inside_temp is not None:
             if outside_temp < target_inside_temp and inside_temp < target_inside_temp:
+                hysteresis_going_up = True
                 next_command = Commands.find_command_just_above_temp(target_inside_temp_correction)
             else:
+                hysteresis_going_up = False
                 next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_correction)
         else:
             if outside_temp < target_inside_temp:
+                hysteresis_going_up = True
                 next_command = Commands.find_command_just_above_temp(target_inside_temp_correction)
             else:
+                hysteresis_going_up = False
                 next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_correction)
 
-        return next_command
+        return next_command, hysteresis_going_up
 
     @staticmethod
     def add_extra_info(extra_info, message):
