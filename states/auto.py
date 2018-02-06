@@ -523,6 +523,7 @@ class Controller:
         self.kp = kp
         self.ki = ki
         self.i_limit = i_limit
+        self.i_lower_limit = -i_limit
         self.integral = 0
         self.current_time = None
 
@@ -532,6 +533,10 @@ class Controller:
 
     def is_reset(self):
         return self.current_time is None
+
+    def set_i_lower_limit(self, value):
+        logger.debug('controller set i lower limit %.4f', value)
+        self.i_lower_limit = value
 
     def update(self, error):
         logger.debug('controller error %.4f', error)
@@ -550,9 +555,9 @@ class Controller:
         if self.integral > self.i_limit:
             self.integral = self.i_limit
             logger.debug('controller integral high limit')
-        elif self.integral < -self.i_limit:
-            self.integral = -self.i_limit
-            logger.debug('controller integral low limit')
+        elif self.integral < self.i_lower_limit:
+            self.integral = self.i_lower_limit
+            logger.debug('controller integral low limit %.4f', self.i_lower_limit)
 
         i_term = self.ki * self.integral
 
@@ -572,9 +577,9 @@ class Auto(State):
     hysteresis_going_up = False
 
     controller = Controller(
-        Decimal('1.3'),  # from target 4 to target 15, this adds (15-4) * 1.3 == 14.3 to the output
+        Decimal(3),
         Decimal(1) / Decimal(3600),
-        Decimal(15) / (Decimal(1) / Decimal(3600)))
+        Decimal(20) / (Decimal(1) / Decimal(3600)))
 
     @staticmethod
     def clear():
@@ -685,21 +690,23 @@ class Auto(State):
         if inside_temp is not None:
             if inside_temp < target_inside_temp:
                 error = target_inside_temp - inside_temp
-                if Auto.controller.integral < 0:
-                    Auto.controller.integral = 0
+                min_correction_temp = Decimal(8)
+                lower_limit = (min_correction_temp - target_inside_temp) / Auto.controller.ki
+                Auto.controller.set_i_lower_limit(lower_limit)
             elif inside_temp > hysteresis:
                 error = hysteresis - inside_temp
+                Auto.controller.set_i_lower_limit(-Auto.controller.i_limit)
             else:
                 error = 0
         else:
             error = 0
 
-        controller_off_limit = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * (
-                target_inside_temp - outside_temp_ts.temp) * 6
+        controller_off_limit = Decimal(2)
 
         if inside_temp is not None and inside_temp > hysteresis + controller_off_limit:
             next_command = Commands.off
             Auto.hysteresis_going_up = False
+            Auto.controller.integral = Auto.controller.i_lower_limit
         else:
             target_inside_temp_correction = target_inside_temp + Auto.controller.update(error)
 
@@ -711,6 +718,8 @@ class Auto(State):
 
             next_command, Auto.hysteresis_going_up = Auto.version_2_next_command(
                 inside_temp, outside_temp_ts.temp, target_inside_temp, target_inside_temp_correction)
+
+        Auto.add_extra_info(extra_info, 'Hysteresis going %s' % ('up' if Auto.hysteresis_going_up else 'down'))
 
         return next_command, extra_info
 
@@ -759,17 +768,16 @@ class Auto(State):
         if inside_temp is not None:
             if outside_temp < target_inside_temp and inside_temp < target_inside_temp:
                 hysteresis_going_up = True
-                next_command = Commands.find_command_just_above_temp(target_inside_temp_correction)
             else:
                 hysteresis_going_up = False
-                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_correction)
+            next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_correction)
         else:
             if outside_temp < target_inside_temp:
                 hysteresis_going_up = True
-                next_command = Commands.find_command_just_above_temp(target_inside_temp_correction)
+                next_command = Commands.heat8
             else:
                 hysteresis_going_up = False
-                next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_correction)
+                next_command = Commands.off
 
         return next_command, hysteresis_going_up
 
