@@ -546,6 +546,7 @@ def get_outside(add_extra_info, mean_forecast):
         receive_ulkoilma_temperature, receive_fmi_temperature, receive_open_weather_map_temperature])
     add_extra_info('Outside temperature: %s' % outside_temp)
     if outside_temp is None:
+        valid_outside = False
         outside_ts = arrow.now()
         if mean_forecast is not None:
             outside_temp = mean_forecast
@@ -553,8 +554,10 @@ def get_outside(add_extra_info, mean_forecast):
         else:
             outside_temp = Decimal(-10)
             add_extra_info('Using predefined outside temperature: %s' % outside_temp)
+    else:
+        valid_outside = True
 
-    return TempTs(temp=outside_temp, ts=outside_ts)
+    return TempTs(temp=outside_temp, ts=outside_ts), valid_outside
 
 
 def get_next_command(inside_temp, outside_temp, target_inside_temp, target_inside_temp_correction):
@@ -573,6 +576,27 @@ def get_next_command(inside_temp, outside_temp, target_inside_temp, target_insid
             next_command = Commands.off
 
     return next_command, hysteresis_going_up
+
+
+def log_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp):
+    status = []
+
+    if not valid_time:
+        status.append('no valid time')
+    if not forecast:
+        status.append('no forecast')
+    if not valid_outside:
+        status.append('no outside temp')
+
+    if inside_temp is None:
+        status.append('no inside temp')
+    elif inside_temp <= target_inside_temp - 1:
+        status.append('inside is 1 degree or more below target')
+
+    if not status:
+        status.append('ok')
+
+    add_extra_info('Status: %s' % ', '.join(status))
 
 
 class Controller:
@@ -709,10 +733,9 @@ class Auto(State):
             extra_info.append(message)
 
         valid_time = have_valid_time()
-        add_extra_info('have_valid_time: %s' % valid_time)
 
         forecast, mean_forecast = get_forecast(add_extra_info, valid_time)
-        outside_temp_ts = get_outside(add_extra_info, mean_forecast)
+        outside_temp_ts, valid_outside = get_outside(add_extra_info, mean_forecast)
 
         if mean_forecast:
             outside_for_target_calc = TempTs(mean_forecast, arrow.now())
@@ -734,12 +757,6 @@ class Auto(State):
 
         inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
         add_extra_info('Inside temperature: %s' % inside_temp)
-
-        if inside_temp is not None:
-            target_diff = inside_temp - target_inside_temp
-            add_extra_info('Inside vs target diff: %s' % decimal_round(target_diff, 2))
-            if target_diff < -1:
-                logger.warning('Inside vs target diff is less than -1: %s' % decimal_round(target_diff, 2))
 
         if inside_temp is not None and inside_temp > config.ALLOWED_MINIMUM_INSIDE_TEMP:
             buffer = get_buffer(inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
@@ -774,7 +791,7 @@ class Auto(State):
         else:
             target_inside_temp_correction = target_inside_temp + Auto.controller.update(error)
 
-            add_extra_info('target_inside_temp_correction: %s' % decimal_round(target_inside_temp_correction, 2))
+            add_extra_info('target from controller: %s' % decimal_round(target_inside_temp_correction, 2))
 
             if Auto.hysteresis_going_up:
                 target_inside_temp = hyst
@@ -783,6 +800,8 @@ class Auto(State):
                 inside_temp, outside_temp_ts.temp, target_inside_temp, target_inside_temp_correction)
 
         add_extra_info('Hysteresis going %s' % ('up' if Auto.hysteresis_going_up else 'down'))
+
+        log_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp)
 
         return next_command, extra_info
 

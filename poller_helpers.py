@@ -435,7 +435,7 @@ def decimal_round(value, decimals=1):
 
 
 def log_temp_info(minimum_inside_temp):
-    from states.auto import Auto, target_inside_temperature, get_buffer
+    from states.auto import target_inside_temperature, get_buffer, hysteresis, get_next_command
 
     seen_off = None
     warn_off = False
@@ -448,13 +448,13 @@ def log_temp_info(minimum_inside_temp):
 
         buffer = get_buffer(target_inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
 
-        hysteresis = Auto.hysteresis(outside_temp_ts.temp, target_inside_temp)
+        hyst = hysteresis(outside_temp_ts.temp, target_inside_temp)
 
         target_inside_temp_correction = target_inside_temp
 
-        command1 = Auto.version_2_next_command(
-            hysteresis - Decimal('0.01'), outside_temp, hysteresis, target_inside_temp_correction)
-        command2 = Auto.version_2_next_command(
+        command1 = get_next_command(
+            hyst - Decimal('0.01'), outside_temp, hyst, target_inside_temp_correction)
+        command2 = get_next_command(
             target_inside_temp + Decimal('0.01'), outside_temp, target_inside_temp, target_inside_temp_correction)
 
         if seen_off and command2 != Commands.off:
@@ -467,7 +467,7 @@ def log_temp_info(minimum_inside_temp):
             'Target inside is %5.2f (hysteresis %5.2f) when outside is %5.1f. '
             'Buffer %s h. When below target temp -> %s until hysteresis reached %s',
             target_inside_temp,
-            hysteresis,
+            hyst,
             outside_temp,
             buffer,
             command1,
