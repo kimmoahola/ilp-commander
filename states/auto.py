@@ -519,8 +519,7 @@ def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside
 
 
 def hysteresis(outside_temp, target_inside_temp):
-    hysteresis_add = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * (target_inside_temp - outside_temp) * 2
-    return target_inside_temp + max(hysteresis_add, 0)
+    return target_inside_temp + Decimal('0.2')
 
 
 def get_forecast(add_extra_info, valid_time):
@@ -578,7 +577,8 @@ def get_next_command(inside_temp, outside_temp, target_inside_temp, target_insid
     return next_command, hysteresis_going_up
 
 
-def log_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp):
+def log_status(add_extra_info, valid_time: bool, forecast, valid_outside: bool, inside_temp,
+               target_inside_temp, controller_i_max: bool):
     status = []
 
     if not valid_time:
@@ -592,6 +592,9 @@ def log_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp,
         status.append('no inside temp')
     elif inside_temp <= target_inside_temp - 1:
         status.append('inside is 1 degree or more below target')
+
+    if controller_i_max:
+        status.append('controller i term at max')
 
     if not status:
         status.append('ok')
@@ -801,7 +804,8 @@ class Auto(State):
 
         add_extra_info('Hysteresis going %s' % ('up' if Auto.hysteresis_going_up else 'down'))
 
-        log_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp)
+        log_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp,
+                   Auto.controller.integral >= Auto.controller.i_limit)
 
         return next_command, extra_info
 
