@@ -477,7 +477,7 @@ def log_temp_info(minimum_inside_temp):
         logger.warning('Will turn off when outside is %5.1f.', seen_off)
 
 
-def have_valid_time(wait_time=30):
+def have_valid_time(wait_time=30) -> bool:
 
     sleep_time = 10
 
