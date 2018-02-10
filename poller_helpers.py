@@ -169,7 +169,7 @@ def send_ir_signal(command: str, extra_info: list = None):
 
     logger.info(command)
 
-    message = '\n'.join(extra_info)
+    message = '\n'.join([time_str(), command] + extra_info)
 
     try:
         actually_send_ir_signal(command)
@@ -180,7 +180,7 @@ def send_ir_signal(command: str, extra_info: list = None):
     email(
         config.EMAIL_ADDRESSES,
         'Send IR',
-        'Send IR %s at %s\n%s' % (command, time_str(), message))
+        message)
 
 
 def time_str(from_str=None):
