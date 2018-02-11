@@ -5,7 +5,7 @@ from decimal import Decimal
 from functools import wraps
 from json import JSONDecodeError
 from statistics import mean
-from typing import Union, Optional
+from typing import Union, Optional, List
 
 import arrow
 import xmltodict
@@ -74,7 +74,7 @@ def caching(cache_name):
     return caching_inner
 
 
-def get_temp_from_temp_api(host_and_port, table_name):
+def get_temp_from_temp_api(host_and_port, table_name) -> (Optional[str], Optional[str]):
     temp, ts = None, None
 
     try:
@@ -96,7 +96,7 @@ def get_temp_from_temp_api(host_and_port, table_name):
 
 @timing
 @caching(cache_name='ulkoilma')
-def receive_ulkoilma_temperature():
+def receive_ulkoilma_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
     temp, ts = get_temp_from_temp_api(
         config.TEMP_API_OUTSIDE.get('host_and_port'), config.TEMP_API_OUTSIDE.get('table_name'))
 
@@ -110,7 +110,7 @@ def receive_ulkoilma_temperature():
 
 @timing
 @caching(cache_name='wc')
-def receive_wc_temperature():
+def receive_wc_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
     temp, ts = get_temp_from_sheet(sheet_index=3)
 
     if ts is not None and temp is not None:
@@ -123,7 +123,7 @@ def receive_wc_temperature():
 
 @timing
 @caching(cache_name='fmi')
-def receive_fmi_temperature():
+def receive_fmi_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
     temp, ts = None, None
 
     try:
@@ -153,7 +153,7 @@ def receive_fmi_temperature():
 
 @timing
 @caching(cache_name='open_weather_map')
-def receive_open_weather_map_temperature():
+def receive_open_weather_map_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
     temp, ts = None, None
 
     try:
@@ -176,7 +176,7 @@ def receive_open_weather_map_temperature():
 
 @timing
 @caching(cache_name='yr.no')
-def receive_yr_no_forecast():
+def receive_yr_no_forecast() -> (Optional[List[TempTs]], Optional[arrow.Arrow]):
     temp, ts = None, None
 
     try:
@@ -220,7 +220,7 @@ def receive_yr_no_forecast():
 
 @timing
 @caching(cache_name='fmi_forecast')
-def receive_fmi_forecast():
+def receive_fmi_forecast() -> (Optional[List[TempTs]], Optional[arrow.Arrow]):
     temp, ts = None, None
 
     try:
@@ -271,7 +271,7 @@ def log_forecast(name, temp):
         logger.info('No forecast from %s')
 
 
-def forecast_mean_temperature(forecast: Forecast):
+def forecast_mean_temperature(forecast: Forecast) -> Optional[Decimal]:
     if forecast and forecast.temps:
         cooling_time_buffer_hours = int(cooling_time_buffer_resolved(
             config.COOLING_TIME_BUFFER, config.ALLOWED_MINIMUM_INSIDE_TEMP))

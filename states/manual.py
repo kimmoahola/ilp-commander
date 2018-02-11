@@ -1,5 +1,5 @@
 # coding=utf-8
-from poller_helpers import Commands, send_ir_signal, write_log_to_sheet
+from poller_helpers import Commands, send_ir_signal, write_log_to_sheet, Command
 from states import State
 
 
@@ -9,7 +9,7 @@ class Manual(State):
         if payload['command'] == 'turn off':
             command = Commands.off
         elif payload['command'] == 'set temp':
-            command = getattr(Commands, 'heat%d' % int(payload['param']['temp']))
+            command: Command = getattr(Commands, 'heat%d' % int(payload['param']['temp']))
 
         if command:
             send_ir_signal(command)
