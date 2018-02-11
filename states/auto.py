@@ -712,7 +712,9 @@ class Auto(State):
         # Send command every now and then even if command has not changed
         force_send_command_time = 60 * 60 * 24
 
-        if Auto.last_command != next_command or time.time() - Auto.last_command_send_time > force_send_command_time:
+        if Auto.last_command is None or \
+                Auto.last_command != next_command or \
+                time.time() - Auto.last_command_send_time > force_send_command_time:
             Auto.last_command = next_command
             Auto.last_command_send_time = time.time()
             send_ir_signal(next_command, extra_info=extra_info)
