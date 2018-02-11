@@ -2,13 +2,14 @@
 import json
 import logging
 import os
+import platform
 import smtplib
 import time
 from decimal import Decimal, ROUND_HALF_UP
 from email.mime.text import MIMEText
-from functools import wraps
+from functools import wraps, total_ordering
 from subprocess import Popen, PIPE
-from typing import NamedTuple, List
+from typing import NamedTuple, List, Optional
 
 import arrow
 import itertools
@@ -32,21 +33,37 @@ TempTs = NamedTuple("TempTs", [('temp', Decimal), ('ts', arrow.Arrow)])
 Forecast = NamedTuple("Forecast", [('temps', List[TempTs]), ('ts', arrow.Arrow)])
 
 
+@total_ordering
+class Command:
+    def __init__(self, command_string: str, temp: Optional[Decimal]):
+        self.command_string = command_string
+        self.temp = temp
+
+    def __eq__(self, other):
+        return self.temp == other.temp
+
+    def __lt__(self, other):
+        return self.temp is None and other.temp is not None or self.temp < other.temp
+
+    def __str__(self):
+        return self.command_string
+
+
 class Commands:
-    off = 'off'
-    heat8 = 'heat_8__swing_down'
-    heat10 = 'heat_10__swing_down'
-    heat16 = 'heat_16__fan_high__swing_down'
-    heat18 = 'heat_18__fan_high__swing_down'
-    heat20 = 'heat_20__fan_high__swing_down'
-    heat22 = 'heat_22__fan_high__swing_down'
-    heat24 = 'heat_24__fan_high__swing_down'
-    heat26 = 'heat_26__fan_high__swing_down'
-    heat28 = 'heat_28__fan_high__swing_down'
-    heat30 = 'heat_30__fan_high__swing_down'
+    off = Command('off', None)
+    heat8 = Command('heat_8__swing_down', Decimal(8))
+    heat10 = Command('heat_10__swing_down', Decimal(10))
+    heat16 = Command('heat_16__fan_high__swing_down', Decimal(16))
+    heat18 = Command('heat_18__fan_high__swing_down', Decimal(18))
+    heat20 = Command('heat_20__fan_high__swing_down', Decimal(20))
+    heat22 = Command('heat_22__fan_high__swing_down', Decimal(22))
+    heat24 = Command('heat_24__fan_high__swing_down', Decimal(24))
+    heat26 = Command('heat_26__fan_high__swing_down', Decimal(26))
+    heat28 = Command('heat_28__fan_high__swing_down', Decimal(28))
+    heat30 = Command('heat_30__fan_high__swing_down', Decimal(30))
 
     @staticmethod
-    def find_command_just_above_temp(temp: Decimal):
+    def find_command_just_above_temp(temp: Decimal) -> Command:
         if temp >= 28:
             return Commands.heat30
         if temp >= 26:
@@ -69,7 +86,7 @@ class Commands:
         return Commands.heat8
 
     @staticmethod
-    def find_command_at_or_just_below_temp(temp: Decimal):
+    def find_command_at_or_just_below_temp(temp: Decimal) -> Command:
         if temp < 8:
             return Commands.off
         if temp < 10:
@@ -163,13 +180,13 @@ def email(addresses, subject, message):
             logger.exception(e)
 
 
-def send_ir_signal(command: str, extra_info: list = None):
+def send_ir_signal(command: Command, extra_info: Optional[list] = None):
     if extra_info is None:
         extra_info = []
 
-    logger.info(command)
+    logger.info(str(command))
 
-    message = '\n'.join([time_str(), command] + extra_info)
+    message = '\n'.join([time_str(), str(command)] + extra_info)
 
     try:
         actually_send_ir_signal(command)
@@ -193,9 +210,9 @@ def time_str(from_str=None):
 
 
 @retry(tries=2, delay=5)
-def actually_send_ir_signal(command: str):
+def actually_send_ir_signal(command: Command):
     try:
-        p = Popen(['irsend', 'SEND_ONCE', 'ilp', command], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        p = Popen(['irsend', 'SEND_ONCE', 'ilp', str(command)], stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output, err = p.communicate('')
         if p.returncode != 0:
             logger.warning('%d: %s - %s' % (p.returncode, output, err))
@@ -210,7 +227,7 @@ def actually_send_ir_signal(command: str):
         logger.exception(e)
     else:
         with orm.db_session:
-            IRSendLog(command=command)
+            IRSendLog(command=str(command))
 
 
 def timing(f):
@@ -321,11 +338,11 @@ def get_message_from_sheet():
 
 
 @timing
-def write_log_to_sheet(next_command, extra_info):
+def write_log_to_sheet(command: Command, extra_info: list):
     sh = InitPygsheets.init_pygsheets()
     cell = 'B1'
 
-    msg = '\n'.join([next_command, time_str()] + extra_info)
+    msg = '\n'.join([str(command), time_str()] + extra_info)
 
     if sh:
         try:
@@ -435,6 +452,7 @@ def decimal_round(value, decimals=1):
 
 
 def log_temp_info(minimum_inside_temp):
+    return
     from states.auto import target_inside_temperature, get_buffer, hysteresis, get_next_command
 
     seen_off = None
@@ -448,7 +466,7 @@ def log_temp_info(minimum_inside_temp):
 
         buffer = get_buffer(target_inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
 
-        hyst = hysteresis(outside_temp_ts.temp, target_inside_temp)
+        hyst = hysteresis(target_inside_temp)
 
         target_inside_temp_correction = target_inside_temp
 
@@ -478,6 +496,9 @@ def log_temp_info(minimum_inside_temp):
 
 
 def have_valid_time(wait_time=30) -> bool:
+
+    if 'windows' in platform.system().lower():
+        return True
 
     sleep_time = 10
 

@@ -5,7 +5,7 @@ from decimal import Decimal
 from functools import wraps
 from json import JSONDecodeError
 from statistics import mean
-from typing import Union
+from typing import Union, Optional
 
 import arrow
 import xmltodict
@@ -15,7 +15,7 @@ from pony import orm
 import config
 from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_temp_from_sheet, \
     median, get_url, time_str, write_log_to_sheet, TempTs, Forecast, decimal_round, have_valid_time, log_temp_info, \
-    SavedState
+    SavedState, Command
 from states import State
 
 
@@ -518,7 +518,7 @@ def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside
     return buffer
 
 
-def hysteresis(outside_temp, target_inside_temp):
+def hysteresis(target_inside_temp: Decimal) -> Decimal:
     return target_inside_temp + Decimal('0.2')
 
 
@@ -561,20 +561,14 @@ def get_outside(add_extra_info, mean_forecast):
 
 def get_next_command(inside_temp, outside_temp, target_inside_temp, target_inside_temp_correction):
     if inside_temp is not None:
-        if outside_temp < target_inside_temp and inside_temp < target_inside_temp:
-            hysteresis_going_up = True
-        else:
-            hysteresis_going_up = False
         next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_correction)
     else:
         if outside_temp < target_inside_temp:
-            hysteresis_going_up = True
             next_command = Commands.heat8
         else:
-            hysteresis_going_up = False
             next_command = Commands.off
 
-    return next_command, hysteresis_going_up
+    return next_command
 
 
 def log_status(add_extra_info, valid_time: bool, forecast, valid_outside: bool, inside_temp,
@@ -603,17 +597,17 @@ def log_status(add_extra_info, valid_time: bool, forecast, valid_outside: bool, 
 
 
 class Controller:
-    def __init__(self, kp, ki, i_limit):
+    def __init__(self, kp: Decimal, ki: Decimal, i_limit: Decimal):
         self.kp = kp
         self.ki = ki
         self.i_limit = i_limit
         self.i_lower_limit = -i_limit
-        self.integral = 0
-        self.current_time = None
+        self.integral = Decimal(0)
+        self.current_time: float = None
 
     def reset(self):
-        self.integral = 0
-        self.current_time = None
+        self.integral = Decimal(0)
+        self.current_time: float = None
 
     def is_reset(self):
         return self.current_time is None
@@ -622,7 +616,7 @@ class Controller:
         logger.debug('controller set i lower limit %.4f', value)
         self.i_lower_limit = value
 
-    def update(self, error):
+    def update(self, error: Decimal) -> Decimal:
         logger.debug('controller error %.4f', error)
 
         p_term = self.kp * error
@@ -655,7 +649,7 @@ class Controller:
 
 
 class Auto(State):
-    last_command = None
+    last_command: Optional[Command] = None
     last_command_send_time = time.time()
     minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
     hysteresis_going_up = False
@@ -667,7 +661,7 @@ class Auto(State):
 
     @staticmethod
     def clear():
-        Auto.last_command = None  # Clear last command so Auto sends command after Manual
+        Auto.last_command: Optional[Command] = None  # Clear last command so Auto sends command after Manual
         Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
         Auto.hysteresis_going_up = False
         Auto.controller.reset()
@@ -676,6 +670,7 @@ class Auto(State):
     def save_state():
         data = json.dumps({'integral': str(Auto.controller.integral)})
         with orm.db_session:
+            # noinspection PyTypeChecker
             saved_state = orm.select(c for c in SavedState).where(name='Auto.controller').first()
             if saved_state:
                 saved_state.set(json=data)
@@ -686,6 +681,7 @@ class Auto(State):
     def load_state():
         if Auto.controller.is_reset():
             with orm.db_session:
+                # noinspection PyTypeChecker
                 saved_state = orm.select(c for c in SavedState).where(name='Auto.controller').first()
                 if saved_state:
                     as_dict = saved_state.to_dict()
@@ -728,7 +724,7 @@ class Auto(State):
         return get_most_recent_message(once=True)
 
     @staticmethod
-    def process(minimum_inside_temp):
+    def process(minimum_inside_temp) -> (Command, list):
         extra_info = []
 
         def add_extra_info(message):
@@ -740,10 +736,10 @@ class Auto(State):
         forecast, mean_forecast = get_forecast(add_extra_info, valid_time)
         outside_temp_ts, valid_outside = get_outside(add_extra_info, mean_forecast)
 
-        if mean_forecast:
-            outside_for_target_calc = TempTs(mean_forecast, arrow.now())
-        else:
-            outside_for_target_calc = outside_temp_ts
+        # if mean_forecast:
+        #     outside_for_target_calc = TempTs(mean_forecast, arrow.now())
+        # else:
+        #     outside_for_target_calc = outside_temp_ts
 
         # target_inside_temp = target_inside_temperature(outside_for_target_calc,
         #                                                config.ALLOWED_MINIMUM_INSIDE_TEMP,
@@ -755,7 +751,7 @@ class Auto(State):
 
         add_extra_info('Target inside temperature: %s' % decimal_round(target_inside_temp, 1))
 
-        hyst = hysteresis(outside_temp_ts.temp, target_inside_temp)
+        hyst = hysteresis(target_inside_temp)
         add_extra_info('Hysteresis: %s' % decimal_round(hyst))
 
         inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
@@ -785,24 +781,37 @@ class Auto(State):
         else:
             error = 0
 
-        controller_off_limit = Decimal(2)
+        controller_output = Auto.controller.update(error)
+
+        controller_off_limit = Decimal(1)
 
         if inside_temp is not None and inside_temp > hyst + controller_off_limit:
             next_command = Commands.off
             Auto.hysteresis_going_up = False
             Auto.controller.integral = Auto.controller.i_lower_limit
         else:
-            target_inside_temp_correction = target_inside_temp + Auto.controller.update(error)
+            target_inside_temp_correction = target_inside_temp + controller_output
 
             add_extra_info('target from controller: %s' % decimal_round(target_inside_temp_correction, 2))
 
-            if Auto.hysteresis_going_up:
-                target_inside_temp = hyst
+            if inside_temp is not None:
+                if inside_temp < target_inside_temp:
+                    Auto.hysteresis_going_up = True
+                elif inside_temp > hyst:
+                    Auto.hysteresis_going_up = False
+            else:
+                Auto.hysteresis_going_up = True
 
-            next_command, Auto.hysteresis_going_up = get_next_command(
+            next_command = get_next_command(
                 inside_temp, outside_temp_ts.temp, target_inside_temp, target_inside_temp_correction)
 
         add_extra_info('Hysteresis going %s' % ('up' if Auto.hysteresis_going_up else 'down'))
+
+        if Auto.last_command is not None:
+            if Auto.hysteresis_going_up and next_command < Auto.last_command:
+                next_command = Auto.last_command
+            elif not Auto.hysteresis_going_up and next_command > Auto.last_command:
+                next_command = Auto.last_command
 
         log_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp,
                    Auto.controller.integral >= Auto.controller.i_limit)
