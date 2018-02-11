@@ -48,6 +48,9 @@ class Command:
     def __str__(self):
         return self.command_string
 
+    def __repr__(self):
+        return str(self)
+
 
 class Commands:
     off = Command('off', None)
