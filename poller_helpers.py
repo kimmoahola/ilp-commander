@@ -43,7 +43,12 @@ class Command:
         return self.temp == other.temp
 
     def __lt__(self, other):
-        return self.temp is None and other.temp is not None or self.temp < other.temp
+        if self.temp is None:
+            return True
+        elif other.temp is None:
+            return False
+        else:
+            return self.temp < other.temp
 
     def __str__(self):
         return self.command_string
@@ -313,6 +318,7 @@ class InitPygsheets:
 
 @retry(tries=3, delay=10)
 def get_url(url):
+    logger.debug(url)
     return requests.get(url, timeout=60)
 
 
