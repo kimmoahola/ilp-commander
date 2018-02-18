@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<weatherdata>
+  <location>
+    <name>Tampere</name>
+    <type>Administration centre</type>
+    <country>Finland</country>
+    <timezone id="Europe/Helsinki" utcoffsetMinutes="120" />
+    <location altitude="114" latitude="61.49911" longitude="23.78712" geobase="geonames" geobaseid="634963" />
+  </location>
+  <credit>
+    <!--In order to use the free weather data from yr no, you HAVE to display 
+the following text clearly visible on your web page. The text should be a 
+link to the specified URL.-->
+    <!--Please read more about our conditions and guidelines at http://om.yr.no/verdata/  English explanation at http://om.yr.no/verdata/free-weather-data/-->
+    <link text="Weather forecast from Yr, delivered by the Norwegian Meteorological Institute and the NRK" url="http://www.yr.no/place/Finland/Western_Finland/Tampere/" />
+  </credit>
+  <links>
+    <link id="xmlSource" url="http://www.yr.no/place/Finland/Western_Finland/Tampere/forecast.xml" />
+    <link id="xmlSourceHourByHour" url="http://www.yr.no/place/Finland/Western_Finland/Tampere/forecast_hour_by_hour.xml" />
+    <link id="overview" url="http://www.yr.no/place/Finland/Western_Finland/Tampere/" />
+    <link id="hourByHour" url="http://www.yr.no/place/Finland/Western_Finland/Tampere/hour_by_hour" />
+    <link id="longTermForecast" url="http://www.yr.no/place/Finland/Western_Finland/Tampere/long" />
+  </links>
+  <meta>
+    <lastupdate>2018-02-18T16:28:00</lastupdate>
+    <nextupdate>2018-02-18T21:00:00</nextupdate>
+  </meta>
+  <sun rise="2018-02-18T08:00:19" set="2018-02-18T17:18:19" />
+  <forecast>
+    <tabular>
+      <time from="2018-02-18T19:00:00" to="2018-02-18T20:00:00">
+        <!-- Valid from 2018-02-18T19:00:00 to 2018-02-18T20:00:00 -->
+        <symbol number="2" numberEx="2" name="Fair" var="02n" />
+        <precipitation value="0" />
+        <!-- Valid at 2018-02-18T19:00:00 -->
+        <windDirection deg="13.0" code="NNE" name="North-northeast" />
+        <windSpeed mps="1.6" name="Light breeze" />
+        <temperature unit="celsius" value="-10" />
+        <pressure unit="hPa" value="1024.6" />
+      </time>
+      <time from="2018-02-18T20:00:00" to="2018-02-18T21:00:00">
+        <!-- Valid from 2018-02-18T20:00:00 to 2018-02-18T21:00:00 -->
+        <symbol number="1" numberEx="1" name="Clear sky" var="01n" />
+        <precipitation value="0" />
+        <!-- Valid at 2018-02-18T20:00:00 -->
+        <windDirection deg="20.1" code="NNE" name="North-northeast" />
+        <windSpeed mps="1.3" name="Light air" />
+        <temperature unit="celsius" value="-11" />
+        <pressure unit="hPa" value="1024.6" />
+      </time>
+    </tabular>
+  </forecast>
+</weatherdata>

@@ -287,31 +287,30 @@ def func_name(func):
         return func._mock_name
 
 
-class Temperatures:
+def get_temp(functions: list, max_ts_diff=None, **kwargs):
+
     MAX_TS_DIFF_MINUTES = 60
 
-    @classmethod
-    def get_temp(cls, functions: list, max_ts_diff=None, **kwargs):
-        if max_ts_diff is None:
-            max_ts_diff = cls.MAX_TS_DIFF_MINUTES
+    if max_ts_diff is None:
+        max_ts_diff = MAX_TS_DIFF_MINUTES
 
-        temperatures = []
+    temperatures = []
 
-        for func in functions:
-            result = func(**kwargs)
-            if result:
-                temp, ts = result
-                if temp is not None:
-                    if ts is None:
+    for func in functions:
+        result = func(**kwargs)
+        if result:
+            temp, ts = result
+            if temp is not None:
+                if ts is None:
+                    temperatures.append((temp, ts))
+                else:
+                    seconds = (arrow.now() - ts).total_seconds()
+                    if abs(seconds) < 60 * max_ts_diff:
                         temperatures.append((temp, ts))
                     else:
-                        seconds = (arrow.now() - ts).total_seconds()
-                        if abs(seconds) < 60 * max_ts_diff:
-                            temperatures.append((temp, ts))
-                        else:
-                            logger.info('Discarding temperature %s, temp: %s, temp time: %s', func_name(func), temp, ts)
+                        logger.info('Discarding temperature %s, temp: %s, temp time: %s', func_name(func), temp, ts)
 
-        return median(temperatures)
+    return median(temperatures)
 
 
 def target_inside_temperature(outside_temp_ts: TempTs,
@@ -523,7 +522,7 @@ def hysteresis(target_inside_temp: Decimal) -> Decimal:
 
 
 def get_forecast(add_extra_info, valid_time):
-    f_temps, f_ts = Temperatures.get_temp([receive_fmi_forecast, receive_yr_no_forecast], max_ts_diff=48 * 60)
+    f_temps, f_ts = get_temp([receive_fmi_forecast, receive_yr_no_forecast], max_ts_diff=48 * 60)
     if f_temps and f_ts:
         forecast = make_forecast(f_temps, f_ts, valid_time)
         log_forecast('get_forecast', forecast.temps)
@@ -541,7 +540,7 @@ def make_forecast(temps, ts, valid_time):
 
 
 def get_outside(add_extra_info, mean_forecast):
-    outside_temp, outside_ts = Temperatures.get_temp([
+    outside_temp, outside_ts = get_temp([
         receive_ulkoilma_temperature, receive_fmi_temperature, receive_open_weather_map_temperature])
     add_extra_info('Outside temperature: %s' % outside_temp)
     if outside_temp is None:
@@ -573,7 +572,7 @@ def get_next_command(inside_temp, outside_temp, target_inside_temp, target_insid
 
 def log_status(add_extra_info, valid_time: bool, forecast, valid_outside: bool, inside_temp,
                target_inside_temp, controller_i_max: bool):
-    status = []
+    status: List[str] = []
 
     if not valid_time:
         status.append('no valid time')
@@ -756,7 +755,7 @@ class Auto(State):
         hyst = hysteresis(target_inside_temp)
         add_extra_info('Hysteresis: %s' % decimal_round(hyst))
 
-        inside_temp = Temperatures.get_temp([receive_wc_temperature])[0]
+        inside_temp = get_temp([receive_wc_temperature])[0]
         add_extra_info('Inside temperature: %s' % inside_temp)
 
         if inside_temp is not None and inside_temp > config.ALLOWED_MINIMUM_INSIDE_TEMP:
