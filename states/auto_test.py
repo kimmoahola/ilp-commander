@@ -11,7 +11,7 @@ from poller_helpers import Commands, TempTs, Forecast
 from states.auto import receive_ulkoilma_temperature, receive_wc_temperature, \
     receive_fmi_temperature, Auto, target_inside_temperature, receive_yr_no_forecast, \
     RequestCache, receive_open_weather_map_temperature, get_buffer, make_forecast, get_temp_from_temp_api, \
-    receive_fmi_forecast, forecast_mean_temperature, get_temp, get_forecast, get_outside, Controller
+    receive_fmi_forecast, forecast_mean_temperature, get_temp, get_forecast, get_outside, Controller, get_error
 
 MAX_TIME_DIFF_MINUTES = 120
 
@@ -322,12 +322,21 @@ class TestGeneral:
         assert temp_ts == TempTs(temp=Decimal(-4), ts=ts)
         assert valid_outside
 
+    def test_get_error(self):
+        assert get_error(Decimal(4), Decimal(5), Decimal('0.2')) == -Decimal('0.8')
+        assert get_error(Decimal(5), Decimal(4), Decimal('0.2')) == Decimal(1)
+        assert get_error(Decimal('3.5'), Decimal('3.8'), Decimal('0.2')) == -Decimal('0.1')
+        assert get_error(Decimal('3.5'), Decimal('3.7'), Decimal('0.2')) == 0
+        assert get_error(Decimal('3.5'), Decimal('3.5'), Decimal('0.2')) == 0
+        assert get_error(Decimal('3.5'), Decimal('3.4'), Decimal('0.2')) == Decimal('0.1')
+        assert get_error(Decimal('3.5'), None, Decimal('0.2')) == 0
+
     def test_controller(self, mocker):
 
         c = Controller(
             Decimal(3),
             Decimal(1) / Decimal(3600),
-            Decimal(20) / (Decimal(1) / Decimal(3600)))
+            Decimal(20))
 
         mocker.patch('time.time', return_value=0)
         assert c.update(Decimal(1)) == Decimal(3)
@@ -339,7 +348,7 @@ class TestGeneral:
         assert c.update(Decimal(2)) == Decimal(6) + Decimal(1) / Decimal(3600) * Decimal(1800)
 
         mocker.patch('time.time', return_value=1800)
-        c.set_i_lower_limit(3 / c.ki)
+        c.set_i_lower_limit(3)
         assert c.update(Decimal(2)) == Decimal(6) + Decimal(3)
 
         mocker.patch('time.time', return_value=72000)
