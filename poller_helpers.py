@@ -269,15 +269,19 @@ def get_most_recent_message(once=False):
 
     if most_recent_message:
         message_dict = json.loads(most_recent_message)
+        command = message_dict.get('command')
 
-        with orm.db_session:
-            param = message_dict['param']
-            if param is None:
-                param = ''
-            else:
-                param = json.dumps(param)
+        if command:
+            with orm.db_session:
+                param = message_dict.get('param')
+                if param is None:
+                    param = ''
+                else:
+                    param = json.dumps(param)
 
-            CommandLog(command=message_dict['command'], param=param)
+                CommandLog(command=command, param=param)
+        else:
+            message_dict = {}
     else:
         message_dict = {}
 
@@ -323,7 +327,7 @@ def get_url(url):
 
 
 @timing
-def get_message_from_sheet():
+def get_message_from_sheet() -> str:
     sh = InitPygsheets.init_pygsheets()
     cell_value = ''
     cell = config.MESSAGE_SHEET_CELL

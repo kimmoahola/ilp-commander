@@ -40,6 +40,7 @@ def test_median_list_of_temps():
 
 def test_send_ir_signal_fail(mocker):
     mock_email = mocker.patch('poller_helpers.email')
+    mocker.patch('time.sleep')
 
     freeze_ts = arrow.get('2017-08-18T15:00:00+00:00')
     with freeze_time(freeze_ts.datetime):
