@@ -517,8 +517,8 @@ def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside
     return buffer
 
 
-def hysteresis(target_inside_temp: Decimal) -> Decimal:
-    return target_inside_temp + Decimal('0.2')
+def hysteresis() -> Decimal:
+    return Decimal('0.2')
 
 
 def get_forecast(add_extra_info, valid_time):
@@ -595,6 +595,16 @@ def log_status(add_extra_info, valid_time: bool, forecast, valid_outside: bool, 
     add_extra_info('Status: %s' % ', '.join(status))
 
 
+def get_error(target_inside_temp: Decimal, inside_temp: Optional[Decimal], hyst: Decimal) -> Decimal:
+    if inside_temp is not None:
+        error = target_inside_temp - inside_temp
+        error -= max([min([error, 0]), -hyst])
+    else:
+        error = 0
+
+    return error
+
+
 class Controller:
     def __init__(self, kp: Decimal, ki: Decimal, i_limit: Decimal):
         self.kp = kp
@@ -625,18 +635,18 @@ class Controller:
         if self.current_time is not None:
             delta_time = Decimal(new_time - self.current_time)
             logger.debug('controller delta_time %.4f', delta_time)
-            self.integral += error * delta_time
+            self.integral += self.ki * error * delta_time
 
         self.current_time = new_time
 
         if self.integral > self.i_limit:
             self.integral = self.i_limit
-            logger.debug('controller integral high limit')
+            logger.debug('controller integral high limit %.4f', self.i_limit)
         elif self.integral < self.i_lower_limit:
             self.integral = self.i_lower_limit
             logger.debug('controller integral low limit %.4f', self.i_lower_limit)
 
-        i_term = self.ki * self.integral
+        i_term = self.integral
 
         logger.debug('controller p_term %.4f', p_term)
         logger.debug('controller i_term %.4f', i_term)
@@ -656,7 +666,7 @@ class Auto(State):
     controller = Controller(
         Decimal(3),
         Decimal(1) / Decimal(3600),
-        Decimal(20) / (Decimal(1) / Decimal(3600)))
+        Decimal(20))
 
     @staticmethod
     def clear():
@@ -684,6 +694,7 @@ class Auto(State):
                 saved_state = orm.select(c for c in SavedState).where(name='Auto.controller').first()
                 if saved_state:
                     as_dict = saved_state.to_dict()
+                    print(as_dict)
                     try:
                         as_dict['json'] = json.loads(as_dict['json'])
                     except JSONDecodeError:
@@ -752,7 +763,7 @@ class Auto(State):
 
         add_extra_info('Target inside temperature: %s' % decimal_round(target_inside_temp, 1))
 
-        hyst = hysteresis(target_inside_temp)
+        hyst = hysteresis()
         add_extra_info('Hysteresis: %s' % decimal_round(hyst))
 
         inside_temp = get_temp([receive_wc_temperature])[0]
@@ -768,25 +779,17 @@ class Auto(State):
                 add_extra_info('Current buffer: %s h (%s) to temp %s C' % (
                     buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
 
-        if inside_temp is not None:
-            if inside_temp < target_inside_temp:
-                error = target_inside_temp - inside_temp
-                min_correction_temp = Decimal(8)
-                lower_limit = (min_correction_temp - target_inside_temp) / Auto.controller.ki
-                Auto.controller.set_i_lower_limit(lower_limit)
-            elif inside_temp > hyst:
-                error = hyst - inside_temp
-                Auto.controller.set_i_lower_limit(-Auto.controller.i_limit)
-            else:
-                error = 0
-        else:
-            error = 0
+        error = get_error(target_inside_temp, inside_temp, hyst)
+
+        min_correction_temp = Commands.heat8.temp - Decimal('0.01')
+        lower_limit = min_correction_temp - target_inside_temp
+        Auto.controller.set_i_lower_limit(lower_limit)
 
         controller_output = Auto.controller.update(error)
 
         controller_off_limit = Decimal(1)
 
-        if inside_temp is not None and inside_temp > hyst + controller_off_limit:
+        if inside_temp is not None and inside_temp > target_inside_temp + hyst + controller_off_limit:
             next_command = Commands.off
             Auto.hysteresis_going_up = False
             Auto.controller.integral = Auto.controller.i_lower_limit
@@ -798,7 +801,7 @@ class Auto(State):
             if inside_temp is not None:
                 if inside_temp < target_inside_temp:
                     Auto.hysteresis_going_up = True
-                elif inside_temp > hyst:
+                elif inside_temp > target_inside_temp + hyst:
                     Auto.hysteresis_going_up = False
             else:
                 Auto.hysteresis_going_up = True
