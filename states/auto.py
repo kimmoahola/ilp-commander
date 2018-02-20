@@ -53,7 +53,11 @@ def caching(cache_name):
                 logger.debug('func:%r args:[%r, %r] cache hit with result: %r' % (f.__name__, args, kw, result))
             else:
                 logger.debug('func:%r args:[%r, %r] cache miss' % (f.__name__, args, kw))
-                result = f(*args, **kw)
+                try:
+                    result = f(*args, **kw)
+                except Exception as e:
+                    logger.exception(e)
+                    result = None
                 if result and result[1] is not None:  # result[1] == timestamp
                     temp, ts = result
                     logger.debug('func:%r args:[%r, %r] storing with result: %r' % (f.__name__, args, kw, result))
