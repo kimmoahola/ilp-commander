@@ -171,7 +171,7 @@ def receive_open_weather_map_temperature() -> (Optional[Decimal], Optional[arrow
             logger.error('%d: %s' % (result.status_code, result.content))
         else:
             result_json = result.json()
-            temp = Decimal(result_json['main']['temp'])
+            temp = decimal_round(result_json['main']['temp'])
             ts = arrow.get(result_json['dt']).to(config.TIMEZONE)
 
     logger.info('temp:%s ts:%s', temp, ts)
