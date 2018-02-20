@@ -348,7 +348,7 @@ class TestGeneral:
         assert c.update(Decimal(2))[0] == Decimal(6) + Decimal(1) / Decimal(3600) * Decimal(1800)
 
         mocker.patch('time.time', return_value=1800)
-        c.set_i_lower_limit(3)
+        c.set_i_low_limit(3)
         assert c.update(Decimal(2))[0] == Decimal(6) + Decimal(3)
 
         mocker.patch('time.time', return_value=72000)

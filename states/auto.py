@@ -613,8 +613,8 @@ class Controller:
     def __init__(self, kp: Decimal, ki: Decimal, i_limit: Decimal):
         self.kp = kp
         self.ki = ki
-        self.i_limit = i_limit
-        self.i_lower_limit = -i_limit
+        self.i_high_limit = i_limit
+        self.i_low_limit = -i_limit
         self.integral = Decimal(0)
         self.current_time: float = None
 
@@ -625,13 +625,17 @@ class Controller:
     def is_reset(self):
         return self.current_time is None
 
-    def set_i_lower_limit(self, value):
-        logger.debug('controller set i lower limit %.4f', value)
-        self.i_lower_limit = value
+    def set_i_low_limit(self, value):
+        logger.debug('controller set i low limit %.4f', value)
+        self.i_low_limit = value
+
+    def set_i_high_limit(self, value):
+        logger.debug('controller set i high limit %.4f', value)
+        self.i_high_limit = value
 
     def set_integral_to_lower_limit(self):
-        self.integral = self.i_lower_limit
-        logger.debug('controller integral low limit %.4f', self.i_lower_limit)
+        self.integral = self.i_low_limit
+        logger.debug('controller integral low limit %.4f', self.i_low_limit)
 
     def update(self, error: Decimal) -> (Decimal, str):
         logger.debug('controller error %.4f', error)
@@ -647,10 +651,10 @@ class Controller:
 
         self.current_time = new_time
 
-        if self.integral > self.i_limit:
-            self.integral = self.i_limit
-            logger.debug('controller integral high limit %.4f', self.i_limit)
-        elif self.integral < self.i_lower_limit:
+        if self.integral > self.i_high_limit:
+            self.integral = self.i_high_limit
+            logger.debug('controller integral high limit %.4f', self.i_high_limit)
+        elif self.integral < self.i_low_limit:
             self.set_integral_to_lower_limit()
 
         i_term = self.integral
@@ -661,11 +665,12 @@ class Controller:
         output = p_term + i_term
 
         logger.debug('controller output %.4f', output)
-        return output, self.log(error, p_term, i_term, output)
+        return output, self.log(error, p_term, i_term, self.i_low_limit, self.i_high_limit, output)
 
     @staticmethod
-    def log(error, p_term, i_term, output) -> str:
-        return 'e %.2f, p %.2f, i %.2f, out %.2f' % (error, p_term, i_term, output)
+    def log(error, p_term, i_term, i_low_limit, i_high_limit, output) -> str:
+        return 'e %.2f, p %.2f, i %.2f (%.2f-%.2f), out %.2f' % (
+            error, p_term, i_term, i_low_limit, i_high_limit, output)
 
 
 class Auto(State):
@@ -793,7 +798,14 @@ class Auto(State):
 
         min_correction_temp = Commands.heat8.temp - Decimal('0.01')
         lower_limit = min_correction_temp - target_inside_temp
-        Auto.controller.set_i_lower_limit(lower_limit)
+        Auto.controller.set_i_low_limit(lower_limit)
+
+        i_high_limits = [
+            Commands.heat30.temp + Decimal('0.01'),
+            outside_temp_ts.temp + Decimal(40),
+            target_inside_temp + Decimal(20),
+        ]
+        Auto.controller.set_i_high_limit(min(i_high_limits) - target_inside_temp)
 
         controller_output, controller_log = Auto.controller.update(error)
 
@@ -828,7 +840,7 @@ class Auto(State):
                 next_command = Auto.last_command
 
         log_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp,
-                   Auto.controller.integral >= Auto.controller.i_limit)
+                   Auto.controller.integral >= Auto.controller.i_high_limit)
 
         return next_command, extra_info
 
