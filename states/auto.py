@@ -317,23 +317,21 @@ def get_temp(functions: list, max_ts_diff=None, **kwargs):
     return median(temperatures)
 
 
-def target_inside_temperature(outside_temp_ts: TempTs,
+def target_inside_temperature(add_extra_info,
+                              outside_temp_ts: TempTs,
                               allowed_min_inside_temp: Decimal,
                               minimum_inside_temp,
                               forecast: Union[Forecast, None],
-                              cooling_time_buffer=config.COOLING_TIME_BUFFER,
-                              extra_info=None) -> Decimal:
+                              cooling_time_buffer=config.COOLING_TIME_BUFFER) -> Decimal:
     # print('target_inside_temperature', '-' * 50)
 
     # from pprint import pprint
     # pprint(forecast)
 
     cooling_time_buffer_hours = cooling_time_buffer_resolved(cooling_time_buffer, outside_temp_ts.temp)
-    # logger.info('Buffer is %s h at %s C', cooling_time_buffer_hours, outside_temp_ts.temp)
 
-    if extra_info is not None:
-        Auto.add_extra_info(extra_info, 'Buffer is %s h at %s C' % (
-            decimal_round(cooling_time_buffer_hours), decimal_round(outside_temp_ts.temp)))
+    add_extra_info('Buffer is %s h at %s C' % (
+        decimal_round(cooling_time_buffer_hours), decimal_round(outside_temp_ts.temp)))
 
     valid_forecast = []
 
@@ -763,18 +761,16 @@ class Auto(State):
         forecast, mean_forecast = get_forecast(add_extra_info, valid_time)
         outside_temp_ts, valid_outside = get_outside(add_extra_info, mean_forecast)
 
-        # if mean_forecast:
-        #     outside_for_target_calc = TempTs(mean_forecast, arrow.now())
-        # else:
-        #     outside_for_target_calc = outside_temp_ts
+        if mean_forecast:
+            outside_for_target_calc = TempTs(mean_forecast, arrow.now())
+        else:
+            outside_for_target_calc = outside_temp_ts
 
-        # target_inside_temp = target_inside_temperature(outside_for_target_calc,
-        #                                                config.ALLOWED_MINIMUM_INSIDE_TEMP,
-        #                                                minimum_inside_temp,
-        #                                                forecast,
-        #                                                extra_info=extra_info)
-
-        target_inside_temp = minimum_inside_temp
+        target_inside_temp = target_inside_temperature(add_extra_info,
+                                                       outside_for_target_calc,
+                                                       config.ALLOWED_MINIMUM_INSIDE_TEMP,
+                                                       minimum_inside_temp,
+                                                       forecast)
 
         add_extra_info('Target inside temperature: %s' % decimal_round(target_inside_temp, 1))
 

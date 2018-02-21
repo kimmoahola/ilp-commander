@@ -222,34 +222,34 @@ class TestGeneral:
             assert ts == arrow.get('2018-02-11T20:30:00+02:00')
 
     def test_target_inside_temperature(self):
-        assert_almost_equal(target_inside_temperature(TempTs(temp=Decimal(5), ts=arrow.now()), Decimal(1), Decimal(20), None),
+        assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(5), ts=arrow.now()), Decimal(1), Decimal(20), None),
                             Decimal(20))
-        assert_almost_equal(target_inside_temperature(TempTs(temp=Decimal(10), ts=arrow.now()), Decimal(1), Decimal(20), None),
+        assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(10), ts=arrow.now()), Decimal(1), Decimal(20), None),
                             Decimal(20))
-        assert_almost_equal(target_inside_temperature(TempTs(temp=Decimal(15), ts=arrow.now()), Decimal(1), Decimal(20), None),
+        assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(15), ts=arrow.now()), Decimal(1), Decimal(20), None),
                             Decimal(20))
-        assert_almost_equal(target_inside_temperature(TempTs(temp=Decimal(-5), ts=arrow.now()), Decimal(1), Decimal(0), None),
+        assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-5), ts=arrow.now()), Decimal(1), Decimal(0), None),
                             Decimal('7.6'))
-        assert_almost_equal(target_inside_temperature(TempTs(temp=Decimal(-11), ts=arrow.now()), Decimal(1), Decimal(0), None),
+        assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-11), ts=arrow.now()), Decimal(1), Decimal(0), None),
                             Decimal('8.8'))
-        assert_almost_equal(target_inside_temperature(TempTs(temp=Decimal(-12), ts=arrow.now()), Decimal(1), Decimal(0), None),
+        assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-12), ts=arrow.now()), Decimal(1), Decimal(0), None),
                             Decimal('8.8'))
-        assert_almost_equal(target_inside_temperature(TempTs(temp=Decimal(-20), ts=arrow.now()), Decimal(1), Decimal(0), None),
+        assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-20), ts=arrow.now()), Decimal(1), Decimal(0), None),
                             Decimal('8.3'))
 
         forecast = [-20] * 8 + [-10] * 16
         assert_almost_equal(
-            target_inside_temperature(TempTs(temp=Decimal(-20), ts=arrow.now()), Decimal(1), Decimal(1), forecast_object(forecast)),
+            target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-20), ts=arrow.now()), Decimal(1), Decimal(1), forecast_object(forecast)),
             Decimal('6.2'))
 
         forecast = [-15] * 8
         assert_almost_equal(
-            target_inside_temperature(TempTs(temp=Decimal(-15), ts=arrow.now()), Decimal(1), Decimal(1), forecast_object(forecast)),
+            target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-15), ts=arrow.now()), Decimal(1), Decimal(1), forecast_object(forecast)),
             Decimal('8.6'))
 
         forecast = [-20] * 8 + [-15] * 8 + [5] * 8
         assert_almost_equal(
-            target_inside_temperature(TempTs(temp=Decimal(-15), ts=arrow.now()), Decimal(1), Decimal(1), forecast_object(forecast)),
+            target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-15), ts=arrow.now()), Decimal(1), Decimal(1), forecast_object(forecast)),
             Decimal('6.2'))
 
     def test_get_buffer(self):
