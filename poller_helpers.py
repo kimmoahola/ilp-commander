@@ -465,47 +465,21 @@ def decimal_round(value, decimals=1):
 
 
 def log_temp_info(minimum_inside_temp):
-    return
-    from states.auto import target_inside_temperature, get_buffer, hysteresis, get_next_command
+    from states.auto import target_inside_temperature, get_buffer
 
-    seen_off = None
-    warn_off = False
-
-    for outside_temp in range(-30, int(minimum_inside_temp + 2), 1):
+    for outside_temp in range(-20, int(minimum_inside_temp + 2), 1):
         outside_temp_ts = TempTs(Decimal(outside_temp), arrow.now())
 
         target_inside_temp = target_inside_temperature(
-            outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, minimum_inside_temp, None)
+            lambda x: None, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, minimum_inside_temp, None)
 
         buffer = get_buffer(target_inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
 
-        hyst = hysteresis(target_inside_temp)
-
-        target_inside_temp_correction = target_inside_temp
-
-        command1 = get_next_command(
-            hyst - Decimal('0.01'), outside_temp, hyst, target_inside_temp_correction)
-        command2 = get_next_command(
-            target_inside_temp + Decimal('0.01'), outside_temp, target_inside_temp, target_inside_temp_correction)
-
-        if seen_off and command2 != Commands.off:
-            warn_off = True
-
-        if seen_off is None and command2 == Commands.off:
-            seen_off = outside_temp
-
         logger.info(
-            'Target inside is %5.2f (hysteresis %5.2f) when outside is %5.1f. '
-            'Buffer %s h. When below target temp -> %s until hysteresis reached %s',
+            'Target inside is %5.2f when forecast mean is %5.1f. Buffer %s h.',
             target_inside_temp,
-            hyst,
             outside_temp,
-            buffer,
-            command1,
-            command2)
-
-    if warn_off:
-        logger.warning('Will turn off when outside is %5.1f.', seen_off)
+            buffer)
 
 
 def have_valid_time(wait_time=30) -> bool:
