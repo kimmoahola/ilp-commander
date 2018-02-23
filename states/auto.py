@@ -560,12 +560,27 @@ def get_outside(add_extra_info, mean_forecast):
     return TempTs(temp=outside_temp, ts=outside_ts), valid_outside
 
 
-def get_next_command(inside_temp, outside_temp, target_inside_temp, target_inside_temp_correction):
+def temp_control_without_inside_temp(outside_temp: Decimal, target_inside_temp: Decimal) -> Decimal:
+    diff = abs(outside_temp - target_inside_temp)
+    control = target_inside_temp + diff * diff * Decimal('0.03') + diff * Decimal('0.3')
+    return max(min(control, Decimal(24)), Decimal(8))
+
+
+def get_next_command(valid_time: bool,
+                     inside_temp: Optional[Decimal],
+                     outside_temp: Decimal,
+                     valid_outside: bool,
+                     target_inside_temp: Decimal,
+                     target_from_controller: Decimal):
+
     if inside_temp is not None:
-        next_command = Commands.find_command_at_or_just_below_temp(target_inside_temp_correction)
+        next_command = Commands.find_command_at_or_just_below_temp(target_from_controller)
     else:
-        if outside_temp < target_inside_temp:
-            next_command = Commands.heat8
+        is_summer = valid_time and 5 <= arrow.now().month <= 9
+
+        if valid_outside and outside_temp < target_inside_temp or not valid_outside and not is_summer:
+            control_without_inside = temp_control_without_inside_temp(outside_temp, target_inside_temp)
+            next_command = Commands.find_command_at_or_just_below_temp(control_without_inside)
         else:
             next_command = Commands.off
 
@@ -825,7 +840,8 @@ class Auto(State):
                 Auto.hysteresis_going_up = True
 
             next_command = get_next_command(
-                inside_temp, outside_temp_ts.temp, target_inside_temp, target_from_controller)
+                valid_time, inside_temp, outside_temp_ts.temp, valid_outside, target_inside_temp,
+                target_from_controller)
 
         add_extra_info('Hysteresis going %s' % ('up' if Auto.hysteresis_going_up else 'down'))
 

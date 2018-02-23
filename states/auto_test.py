@@ -11,7 +11,8 @@ from poller_helpers import Commands, TempTs, Forecast
 from states.auto import receive_ulkoilma_temperature, receive_wc_temperature, \
     receive_fmi_temperature, Auto, target_inside_temperature, receive_yr_no_forecast, \
     RequestCache, receive_open_weather_map_temperature, get_buffer, make_forecast, get_temp_from_temp_api, \
-    receive_fmi_forecast, forecast_mean_temperature, get_temp, get_forecast, get_outside, Controller, get_error
+    receive_fmi_forecast, forecast_mean_temperature, get_temp, get_forecast, get_outside, Controller, get_error, \
+    temp_control_without_inside_temp, get_next_command
 
 MAX_TIME_DIFF_MINUTES = 120
 
@@ -321,6 +322,22 @@ class TestGeneral:
 
         assert temp_ts == TempTs(temp=Decimal(-4), ts=ts)
         assert valid_outside
+
+    def test_temp_control_without_inside_temp(self):
+        assert temp_control_without_inside_temp(Decimal(-2), Decimal('3.5')) == Decimal(8)
+        assert temp_control_without_inside_temp(Decimal(-7), Decimal(4)) == Decimal('10.93')
+        assert temp_control_without_inside_temp(Decimal(-20), Decimal(4)) == Decimal(24)
+
+    def test_get_next_command(self):
+        assert get_next_command(True, Decimal(3), Decimal(-15), True, Decimal('3.5'), Decimal(9)) == Commands.heat8
+        with freeze_time('2018-05-02T00:00:00+02:00'):
+            assert get_next_command(False, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.heat10
+            assert get_next_command(True, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.off
+            assert get_next_command(True, None, Decimal(-10), True, Decimal('3.5'), Decimal(9)) == Commands.heat10
+            assert get_next_command(True, None, Decimal('3.5'), True, Decimal('3.5'), Decimal(9)) == Commands.off
+            assert get_next_command(True, Decimal('3.5'), Decimal(3), True, Decimal('3.5'), Decimal(7)) == Commands.off
+        with freeze_time('2018-04-30T00:00:00+02:00'):
+            assert get_next_command(True, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.heat10
 
     def test_get_error(self):
         assert get_error(Decimal(4), Decimal(5), Decimal('0.2')) == -Decimal('0.8')
