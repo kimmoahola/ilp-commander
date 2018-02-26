@@ -15,7 +15,7 @@ from pony import orm
 import config
 from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_temp_from_sheet, \
     median, get_url, time_str, write_log_to_sheet, TempTs, Forecast, decimal_round, have_valid_time, log_temp_info, \
-    SavedState, Command
+    SavedState, Command, email
 from states import State
 
 
@@ -609,7 +609,10 @@ def log_status(add_extra_info, valid_time: bool, forecast, valid_outside: bool, 
     if not status:
         status.append('ok')
 
-    add_extra_info('Status: %s' % ', '.join(status))
+    status_str = ', '.join(status)
+    add_extra_info('Status: %s' % status_str)
+
+    return status_str
 
 
 def get_error(target_inside_temp: Decimal, inside_temp: Optional[Decimal], hyst: Decimal) -> Decimal:
@@ -691,6 +694,7 @@ class Auto(State):
     last_command_send_time = time.time()
     minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
     hysteresis_going_up = False
+    last_status_email_sent: Optional[str] = None
 
     controller = Controller(
         Decimal(3),
@@ -703,6 +707,7 @@ class Auto(State):
         Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
         Auto.hysteresis_going_up = False
         Auto.controller.reset()
+        Auto.last_status_email_sent = None
 
     @staticmethod
     def save_state():
@@ -851,10 +856,19 @@ class Auto(State):
             elif not Auto.hysteresis_going_up and next_command > Auto.last_command:
                 next_command = Auto.last_command
 
-        log_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp,
-                   Auto.controller.integral >= Auto.controller.i_high_limit)
+        Auto.handle_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp)
 
         return next_command, extra_info
+
+    @staticmethod
+    def handle_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp):
+        status = log_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp,
+                            Auto.controller.integral >= Auto.controller.i_high_limit)
+
+        if Auto.last_status_email_sent != status:
+            if Auto.last_status_email_sent is not None:
+                email('Status', status)
+            Auto.last_status_email_sent = status
 
     def nex(self, payload):
         from states.manual import Manual
