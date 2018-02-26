@@ -60,7 +60,8 @@ def mocker_init(mocker):
     mocker.patch('time.sleep')
     mocker.patch('states.auto.Auto.load_state')
     mocker.patch('requests.get', side_effect=Exception(''))
-    return mock_send_ir_signal
+    mock_email = mocker.patch('states.auto.email')
+    return mock_send_ir_signal, mock_email
 
 
 def mock_inside(mocker, temp):
@@ -417,27 +418,19 @@ class TestGeneral:
 class TestAuto:
     @staticmethod
     def setup_method():
+        Auto.clear()
         RequestCache.reset()
-
-    @staticmethod
-    def run_auto_ver2():
-        Auto.clear()
-        auto = Auto()
-        auto.run({})
-        Auto.clear()
 
     def test_auto_message_wait(self, mocker):
         mocker_init(mocker)
 
         auto = Auto()
         payload = auto.run({})
-        Auto.clear()
 
         assert payload == {}
         mock_get_message_from_sheet = mocker.patch('poller_helpers.get_message_from_sheet',
                                                    return_value='{ "command":"auto", "param":null }')
 
-        auto = Auto()
         payload = auto.run({})
         Auto.clear()
 
@@ -446,7 +439,7 @@ class TestAuto:
         assert auto.nex(payload) == Auto
 
     def test_auto_minimum_inside_temp(self, mocker):
-        mock_send_ir_signal = mocker_init(mocker)
+        mock_send_ir_signal, _ = mocker_init(mocker)
         mock_inside(mocker, config.MINIMUM_INSIDE_TEMP + 5)
         mock_outside(mocker, config.MINIMUM_INSIDE_TEMP + 3)
 
@@ -463,3 +456,17 @@ class TestAuto:
         auto.run({'command': 'auto', 'param': None})
         assert mock_send_ir_signal.call_count == 2
         assert mock_send_ir_signal.call_args[0][0] == Commands.off
+
+    def test_auto_status_email(self, mocker):
+        _, mock_email = mocker_init(mocker)
+
+        auto = Auto()
+        auto.run({})
+        assert mock_email.call_count == 0
+
+        mock_inside(mocker, config.MINIMUM_INSIDE_TEMP - 5)
+        auto.run({})
+
+        assert mock_email.call_count == 1
+        assert mock_email.call_args[0][0] == 'Status'
+        assert mock_email.call_args[0][1] == 'no forecast, no outside temp, inside is 1 degree or more below target'

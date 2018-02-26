@@ -173,9 +173,9 @@ def send_email(address, mime_text):
     s.quit()
 
 
-def email(addresses, subject, message):
+def email(subject, message):
 
-    for address in addresses:
+    for address in config.EMAIL_ADDRESSES:
 
         mime_text = MIMEText(message.encode('utf-8'), 'plain', 'utf-8')
         mime_text['Subject'] = subject
@@ -202,10 +202,7 @@ def send_ir_signal(command: Command, extra_info: Optional[list] = None):
         logger.exception(e)
         message += '\nirsend: %s' % type(e).__name__
 
-    email(
-        config.EMAIL_ADDRESSES,
-        'Send IR',
-        message)
+    email('Send IR', message)
 
 
 def time_str(from_str=None):

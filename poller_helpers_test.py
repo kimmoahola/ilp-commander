@@ -47,7 +47,7 @@ def test_send_ir_signal_fail(mocker):
         send_ir_signal(Commands.heat20, extra_info=['Foo1', 'Foo2'])
 
     mock_email.assert_called_once_with(
-        config.EMAIL_ADDRESSES, 'Send IR',
+        'Send IR',
         '18.08.2017 18:00\nheat_20__fan_high__swing_down\nFoo1\nFoo2\nirsend: FileNotFoundError')
 
 
@@ -60,7 +60,7 @@ def test_send_ir_signal_ok(mocker):
         send_ir_signal(Commands.heat20, extra_info=['Foo1', 'Foo2'])
 
     mock_email.assert_called_once_with(
-        config.EMAIL_ADDRESSES, 'Send IR',
+        'Send IR',
         '18.08.2017 18:00\nheat_20__fan_high__swing_down\nFoo1\nFoo2')
 
     mock_popen.assert_called_once()
