@@ -60,6 +60,7 @@ def mocker_init(mocker):
     mocker.patch('time.sleep')
     mocker.patch('states.auto.Auto.load_state')
     mocker.patch('requests.get', side_effect=Exception(''))
+    mocker.patch('states.auto.have_valid_time')
     mock_email = mocker.patch('states.auto.email')
     return mock_send_ir_signal, mock_email
 
