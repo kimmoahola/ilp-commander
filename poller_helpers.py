@@ -256,7 +256,7 @@ def get_most_recent_message(once=False):
         if most_recent_message:
             break
         else:
-            sleep_time = 60 * 10
+            sleep_time = 60 * 15
             logger.info('Sleeping %d %s', sleep_time, 'secs')
             time.sleep(sleep_time)
 
