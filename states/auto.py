@@ -615,28 +615,31 @@ def log_status(add_extra_info, valid_time: bool, forecast, valid_outside: bool, 
     return status_str
 
 
-def get_error(target_inside_temp: Decimal, inside_temp: Optional[Decimal], hyst: Decimal) -> Decimal:
+def get_error(target_inside_temp: Decimal, inside_temp: Optional[Decimal], hyst: Decimal) -> Optional[Decimal]:
     if inside_temp is not None:
         error = target_inside_temp - inside_temp
         error -= max([min([error, 0]), -hyst])
     else:
-        error = 0
+        error = None
 
     return error
 
 
 class Controller:
-    def __init__(self, kp: Decimal, ki: Decimal, i_limit: Decimal):
+    def __init__(self, kp: Decimal, ki: Decimal, kd: Decimal, i_limit: Decimal):
         self.kp = kp
         self.ki = ki
+        self.kd = kd
         self.i_high_limit = i_limit
         self.i_low_limit = -i_limit
         self.integral = Decimal(0)
         self.current_time: float = None
+        self.past_errors: List[(Decimal, Decimal)] = []  # time and error
 
     def reset(self):
         self.integral = Decimal(0)
         self.current_time: float = None
+        self.past_errors: List[(Decimal, Decimal)] = []  # time and error
 
     def is_reset(self):
         return self.current_time is None
@@ -653,7 +656,39 @@ class Controller:
         self.integral = self.i_low_limit
         logger.debug('controller integral low limit %.4f', self.i_low_limit)
 
-    def update(self, error: Decimal) -> (Decimal, str):
+    def _update_past_errors(self, error: Decimal):
+        self.past_errors.append((Decimal(time.time()), error))
+
+        hours = Decimal(3600) * Decimal(3)
+        past_error_time_limit = Decimal(time.time()) - hours
+
+        self.past_errors = [
+            past_error
+            for past_error
+            in self.past_errors
+            if past_error[0] >= past_error_time_limit
+        ]
+
+    def _past_error_slope(self) -> Decimal:
+        min_time = Decimal(60 * 30)  # 30 min
+        if self.past_errors and self.past_errors[-1][0] - self.past_errors[0][0] < min_time:
+            return Decimal(0)
+        n = len(self.past_errors)
+        sum_xy = sum(p[0] * p[1] for p in self.past_errors)
+        sum_x = sum(p[0] for p in self.past_errors)
+        sum_y = sum(p[1] for p in self.past_errors)
+        sum_x2 = sum(p[0] * p[0] for p in self.past_errors)
+        divider = (n * sum_x2 - sum_x * sum_x)
+        if divider == 0:
+            return Decimal(0)
+        return (n * sum_xy - sum_x * sum_y) / divider
+
+    def update(self, error: Optional[Decimal]) -> (Decimal, str):
+        if error is None:
+            error = Decimal(0)
+        else:
+            self._update_past_errors(error)
+
         logger.debug('controller error %.4f', error)
 
         p_term = self.kp * error
@@ -675,18 +710,22 @@ class Controller:
 
         i_term = self.integral
 
+        d_term = self.kd * self._past_error_slope()
+
         logger.debug('controller p_term %.4f', p_term)
         logger.debug('controller i_term %.4f', i_term)
+        logger.debug('controller d_term %.4f', d_term)
+        logger.debug('controller past errors %s', [(decimal_round(p[0]), decimal_round(p[1])) for p in self.past_errors])
 
-        output = p_term + i_term
+        output = p_term + i_term + d_term
 
         logger.debug('controller output %.4f', output)
-        return output, self.log(error, p_term, i_term, self.i_low_limit, self.i_high_limit, output)
+        return output, self.log(error, p_term, i_term, d_term, self.i_low_limit, self.i_high_limit, output)
 
     @staticmethod
-    def log(error, p_term, i_term, i_low_limit, i_high_limit, output) -> str:
-        return 'e %.2f, p %.2f, i %.2f (%.2f-%.2f), out %.2f' % (
-            error, p_term, i_term, i_low_limit, i_high_limit, output)
+    def log(error, p_term, i_term, d_term, i_low_limit, i_high_limit, output) -> str:
+        return 'e %.2f, p %.2f, i %.2f (%.2f-%.2f), d %.2f, out %.2f' % (
+            error, p_term, i_term, i_low_limit, i_high_limit, d_term, output)
 
 
 class Auto(State):
@@ -699,6 +738,7 @@ class Auto(State):
     controller = Controller(
         Decimal(3),
         Decimal(1) / Decimal(3600),
+        Decimal(3600) * Decimal(15),
         Decimal(20))
 
     @staticmethod
@@ -812,7 +852,8 @@ class Auto(State):
 
         error = get_error(target_inside_temp, inside_temp, hyst)
 
-        min_correction_temp = Commands.heat8.temp - Decimal('0.01')
+        degrees_per_hour_slope = Decimal('0.1') / Decimal(3600)
+        min_correction_temp = Commands.heat8.temp - Decimal('0.01') - degrees_per_hour_slope * Auto.controller.kd
         lower_limit = min_correction_temp - target_inside_temp
         Auto.controller.set_i_low_limit(lower_limit)
 
