@@ -387,13 +387,14 @@ class TestGeneral:
         assert get_error(Decimal('3.5'), Decimal('3.7'), Decimal('0.2')) == 0
         assert get_error(Decimal('3.5'), Decimal('3.5'), Decimal('0.2')) == 0
         assert get_error(Decimal('3.5'), Decimal('3.4'), Decimal('0.2')) == Decimal('0.1')
-        assert get_error(Decimal('3.5'), None, Decimal('0.2')) == 0
+        assert get_error(Decimal('3.5'), None, Decimal('0.2')) is None
 
     def test_controller(self, mocker):
 
         c = Controller(
             Decimal(3),
             Decimal(1) / Decimal(3600),
+            Decimal(3600) * Decimal(15),
             Decimal(20))
 
         mocker.patch('time.time', return_value=0)
@@ -407,7 +408,7 @@ class TestGeneral:
 
         mocker.patch('time.time', return_value=1800)
         c.set_i_low_limit(3)
-        assert c.update(Decimal(2))[0] == Decimal(6) + Decimal(3)
+        assert c.update(Decimal(2))[0] == Decimal(6) + Decimal(3) + Decimal(36)
 
         mocker.patch('time.time', return_value=72000)
         assert c.update(Decimal(2))[0] == Decimal(6) + Decimal(20)
