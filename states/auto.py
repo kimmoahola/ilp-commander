@@ -864,28 +864,21 @@ class Auto(State):
 
         controller_output, controller_log = Auto.controller.update(error)
 
-        controller_off_limit = Decimal(1)
+        target_from_controller = target_inside_temp + controller_output
 
-        if inside_temp is not None and inside_temp > target_inside_temp + hyst + controller_off_limit:
-            next_command = Commands.off
-            Auto.hysteresis_going_up = False
-            Auto.controller.set_integral_to_lower_limit()
-        else:
-            target_from_controller = target_inside_temp + controller_output
+        add_extra_info('Controller: %s (%s)' % (decimal_round(target_from_controller, 2), controller_log))
 
-            add_extra_info('Controller: %s (%s)' % (decimal_round(target_from_controller, 2), controller_log))
-
-            if inside_temp is not None:
-                if inside_temp < target_inside_temp:
-                    Auto.hysteresis_going_up = True
-                elif inside_temp > target_inside_temp + hyst:
-                    Auto.hysteresis_going_up = False
-            else:
+        if inside_temp is not None:
+            if inside_temp < target_inside_temp:
                 Auto.hysteresis_going_up = True
+            elif inside_temp > target_inside_temp + hyst:
+                Auto.hysteresis_going_up = False
+        else:
+            Auto.hysteresis_going_up = True
 
-            next_command = get_next_command(
-                valid_time, inside_temp, outside_temp_ts.temp, valid_outside, target_inside_temp,
-                target_from_controller)
+        next_command = get_next_command(
+            valid_time, inside_temp, outside_temp_ts.temp, valid_outside, target_inside_temp,
+            target_from_controller)
 
         add_extra_info('Hysteresis going %s' % ('up' if Auto.hysteresis_going_up else 'down'))
 
