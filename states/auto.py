@@ -736,8 +736,8 @@ class Auto(State):
     last_status_email_sent: Optional[str] = None
 
     controller = Controller(
-        Decimal(3),
-        Decimal(1) / Decimal(3600),
+        (Commands.heat30.temp - Decimal(15)) / (Decimal(15) - Decimal('3.5')),  # 1.304
+        Decimal(3) / Decimal(3600),
         Decimal(3600) * Decimal(15),
         Decimal(20))
 
@@ -859,8 +859,6 @@ class Auto(State):
 
         i_high_limits = [
             Commands.heat30.temp + Decimal('0.01'),
-            outside_temp_ts.temp + Decimal(40),
-            target_inside_temp + Decimal(20),
         ]
         Auto.controller.set_i_high_limit(min(i_high_limits) - target_inside_temp)
 
