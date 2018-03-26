@@ -569,7 +569,7 @@ def get_outside(add_extra_info, mean_forecast):
 
 def temp_control_without_inside_temp(outside_temp: Decimal, target_inside_temp: Decimal) -> Decimal:
     diff = abs(outside_temp - target_inside_temp)
-    control = target_inside_temp + diff * diff * Decimal('0.03') + diff * Decimal('0.3')
+    control = Decimal(3) + diff * diff * Decimal('0.03') + diff * Decimal('0.2')
     return max(min(control, Decimal(24)), Decimal(8))
 
 
