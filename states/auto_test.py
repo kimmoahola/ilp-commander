@@ -371,14 +371,14 @@ class TestGeneral:
 
     def test_get_next_command(self):
         assert get_next_command(True, Decimal(3), Decimal(-15), True, Decimal('3.5'), Decimal(9)) == Commands.heat8
-        with freeze_time('2018-05-02T00:00:00+02:00'):
-            assert get_next_command(False, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.heat10
+        with freeze_time('2018-05-02T00:00:00+02:00'):  # Summer
+            assert get_next_command(False, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.heat16
             assert get_next_command(True, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.off
-            assert get_next_command(True, None, Decimal(-10), True, Decimal('3.5'), Decimal(9)) == Commands.heat10
+            assert get_next_command(True, None, Decimal(-10), True, Decimal('3.5'), Decimal(9)) == Commands.heat16
             assert get_next_command(True, None, Decimal('3.5'), True, Decimal('3.5'), Decimal(9)) == Commands.off
             assert get_next_command(True, Decimal('3.5'), Decimal(3), True, Decimal('3.5'), Decimal(7)) == Commands.off
         with freeze_time('2018-04-30T00:00:00+02:00'):
-            assert get_next_command(True, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.heat10
+            assert get_next_command(True, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.heat16
 
     def test_get_error(self):
         assert get_error(Decimal(4), Decimal(5), Decimal('0.2')) == -Decimal('0.8')
