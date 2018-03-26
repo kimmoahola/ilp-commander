@@ -118,6 +118,20 @@ class Commands:
 
         return Commands.heat30
 
+    @staticmethod
+    def command_from_controller(value: Decimal) -> Command:
+        # < 8 -> off
+        # 8-10 -> 8
+        # 10-13 -> 10
+        # 13-16 -> 16
+        # 16-18 -> 18
+        # 18-20 -> 20
+
+        if value < 13:
+            return Commands.find_command_at_or_just_below_temp(value)
+        else:
+            return Commands.find_command_just_above_temp(value)
+
 
 db = orm.Database()
 

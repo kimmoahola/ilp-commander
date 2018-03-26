@@ -574,13 +574,13 @@ def get_next_command(valid_time: bool,
                      target_from_controller: Decimal):
 
     if inside_temp is not None:
-        next_command = Commands.find_command_at_or_just_below_temp(target_from_controller)
+        next_command = Commands.command_from_controller(target_from_controller)
     else:
         is_summer = valid_time and 5 <= arrow.now().month <= 9
 
         if valid_outside and outside_temp < target_inside_temp or not valid_outside and not is_summer:
             control_without_inside = temp_control_without_inside_temp(outside_temp, target_inside_temp)
-            next_command = Commands.find_command_at_or_just_below_temp(control_without_inside)
+            next_command = Commands.command_from_controller(control_without_inside)
         else:
             next_command = Commands.off
 
