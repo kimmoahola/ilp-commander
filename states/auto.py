@@ -275,11 +275,9 @@ def log_forecast(name, temp):
         logger.info('No forecast from %s')
 
 
-def forecast_mean_temperature(forecast: Forecast) -> Optional[Decimal]:
+def forecast_mean_temperature(forecast: Forecast, hours: int = 24) -> Optional[Decimal]:
     if forecast and forecast.temps:
-        cooling_time_buffer_hours = int(cooling_time_buffer_resolved(
-            config.COOLING_TIME_BUFFER, config.ALLOWED_MINIMUM_INSIDE_TEMP))
-        return mean(t.temp for t in forecast.temps[:cooling_time_buffer_hours])
+        return mean(t.temp for t in forecast.temps[:int(hours)])
     else:
         return None
 
@@ -328,7 +326,7 @@ def target_inside_temperature(add_extra_info,
     # from pprint import pprint
     # pprint(forecast)
 
-    cooling_time_buffer_hours = cooling_time_buffer_resolved(cooling_time_buffer, outside_temp_ts.temp)
+    cooling_time_buffer_hours = cooling_time_buffer_resolved(cooling_time_buffer, outside_temp_ts.temp, forecast)
 
     add_extra_info('Buffer is %s h at %s C' % (
         decimal_round(cooling_time_buffer_hours), decimal_round(outside_temp_ts.temp)))
@@ -354,7 +352,7 @@ def target_inside_temperature(add_extra_info,
     # pprint(reversed_forecast[-1].ts)
 
     iteration_inside_temp = allowed_min_inside_temp
-    iteration_ts = arrow.now().shift(hours=cooling_time_buffer_hours)
+    iteration_ts = arrow.now().shift(hours=float(cooling_time_buffer_hours))
     # print('iteration_ts', iteration_ts)
 
     # if reversed_forecast[0].ts < iteration_ts:
@@ -416,11 +414,20 @@ def target_inside_temperature(add_extra_info,
     return max(iteration_inside_temp, minimum_inside_temp)
 
 
-def cooling_time_buffer_resolved(cooling_time_buffer, outside_temp):
+def cooling_time_buffer_resolved(cooling_time_buffer, outside_temp, forecast: Union[Forecast, None]) -> Decimal:
     try:
-        return float(cooling_time_buffer)
+        return Decimal(cooling_time_buffer)
     except:
-        return float(cooling_time_buffer(outside_temp))
+        buffer = Decimal(20)
+
+        for i in range(3):
+            forecast_mean = forecast_mean_temperature(forecast, buffer)
+            if forecast_mean is None:
+                forecast_mean = outside_temp
+
+            buffer = Decimal(cooling_time_buffer(forecast_mean))
+
+        return buffer
 
 
 def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside_temp: Decimal,
