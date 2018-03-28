@@ -46,10 +46,10 @@ COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF = Decimal('0.015')
 
 
 def cooling_time_buffer_func(outside_temp):
-    a = Decimal('0.08')
-    b = 4
-    c = 68
-    return max(a * outside_temp * outside_temp + b * outside_temp + c, 20)  # hours
+    a = 0
+    b = 2
+    c = 38
+    return max(a * outside_temp * outside_temp + b * outside_temp + c, 10)  # hours
 
 
 COOLING_TIME_BUFFER = cooling_time_buffer_func  # hours
