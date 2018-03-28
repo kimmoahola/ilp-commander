@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/termopetteri/ilp-commander.svg?branch=master)](https://travis-ci.org/termopetteri/ilp-commander)
+
 # Install
 
 - Automatic installation script assumes that this is cloned to `/home/pi/ilp-commander/` and that there's a user `pi` at `/home/pi`
