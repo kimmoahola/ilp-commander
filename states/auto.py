@@ -745,7 +745,7 @@ class Auto(State):
     controller = Controller(
         (Commands.heat30.temp - Decimal(15)) / (Decimal(15) - Decimal('3.5')),  # 1.304
         Decimal(2) / Decimal(3600),
-        Decimal(3600) * Decimal(15),
+        Decimal(3600) * Decimal(25),
         Decimal(20))
 
     @staticmethod
