@@ -232,27 +232,33 @@ class TestGeneral:
         assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(15), ts=arrow.now()), Decimal(1), Decimal(20), None),
                             Decimal(20))
         assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-5), ts=arrow.now()), Decimal(1), Decimal(0), None),
-                            Decimal('7.6'))
+                            Decimal('4.1'))
         assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-11), ts=arrow.now()), Decimal(1), Decimal(0), None),
-                            Decimal('8.8'))
+                            Decimal('4.2'))
         assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-12), ts=arrow.now()), Decimal(1), Decimal(0), None),
-                            Decimal('8.8'))
+                            Decimal(4))
         assert_almost_equal(target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-20), ts=arrow.now()), Decimal(1), Decimal(0), None),
-                            Decimal('8.3'))
+                            Decimal('4.4'))
 
         forecast = [-20] * 8 + [-10] * 16
         assert_almost_equal(
             target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-20), ts=arrow.now()), Decimal(1), Decimal(1), forecast_object(forecast)),
-            Decimal('6.2'))
+            Decimal('4.1'))
 
         forecast = [-15] * 8
         assert_almost_equal(
             target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-15), ts=arrow.now()), Decimal(1), Decimal(1), forecast_object(forecast)),
-            Decimal('8.6'))
+            Decimal('3.6'))
 
         forecast = [-20] * 8 + [-15] * 8 + [5] * 8
         assert_almost_equal(
             target_inside_temperature(lambda x: None, TempTs(temp=Decimal(-15), ts=arrow.now()), Decimal(1), Decimal(1), forecast_object(forecast)),
+            Decimal('4.2'))
+
+        # 2018-03-07 17:30:58,568
+        forecast = [Decimal(d) for d in '-7.65 -7.85 -7.45 -8.0 -8.05 -8.15 -8.25 -8.8 -8.95 -9.05 -9.15 -9.25 -9.85 -9.95 -10.05 -9.4 -9.1 -8.2 -7.3 -6.4 -6.0 -5.35 -5.35 -6.0 -6.2 -7.0 -7.15 -7.2 -7.25 -7.2 -7.1 -7.05 -6.85 -6.7 -6.55 -5.9 -5.75 -5.65 -5.5 -4.8 -3.9 -3.6 -2.95 -2.7 -2.0 -1.9 -1.75 -1.7 -2.45 -2.6 -2.7 -2.75 -2.85 -2.9 -3.1 -4.45 -4.8 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -1 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2 -2 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 0 0 0 0 0 0 -2 -2 -2 -2 -2 -2 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 1 1 1 1 1 1 -1 -1 -1 -1 -1 -1 -3 -3 -3 -3 -3 -3 -5 -5 -5 -5 -5 -5 -1 -1 -1 -1 -1 -1 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 1 1 1 1 1 1 0 0 0 0 0 0 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 2 2 2 2 2 2 1 1 1 1 1 1 0 0 0 0 0 0 1 1 1 1 1 1 3 3 3 3 3 3 3 3 3 3 3 3'.split(' ')]
+        assert_almost_equal(
+            target_inside_temperature(lambda x: None, TempTs(temp=Decimal('-5.3'), ts=arrow.now()), Decimal(1), Decimal('3.5'), forecast_object(forecast), Decimal('31.3')),
             Decimal('6.2'))
 
     def test_get_buffer(self):
@@ -288,6 +294,16 @@ class TestGeneral:
         buffer = get_buffer(
             Decimal(3), TempTs(temp=Decimal(-5), ts=arrow.now()), Decimal(1), forecast_object(forecast))
         assert_almost_equal(Decimal(buffer), Decimal(29))
+
+        # 2018-03-07 17:30:58,568
+        forecast = [Decimal(d) for d in '-7.65 -7.85 -7.45 -8.0 -8.05 -8.15 -8.25 -8.8 -8.95 -9.05 -9.15 -9.25 -9.85 -9.95 -10.05 -9.4 -9.1 -8.2 -7.3 -6.4 -6.0 -5.35 -5.35 -6.0 -6.2 -7.0 -7.15 -7.2 -7.25 -7.2 -7.1 -7.05 -6.85 -6.7 -6.55 -5.9 -5.75 -5.65 -5.5 -4.8 -3.9 -3.6 -2.95 -2.7 -2.0 -1.9 -1.75 -1.7 -2.45 -2.6 -2.7 -2.75 -2.85 -2.9 -3.1 -4.45 -4.8 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -1 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2 -2 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 0 0 0 0 0 0 -2 -2 -2 -2 -2 -2 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 1 1 1 1 1 1 -1 -1 -1 -1 -1 -1 -3 -3 -3 -3 -3 -3 -5 -5 -5 -5 -5 -5 -1 -1 -1 -1 -1 -1 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 1 1 1 1 1 1 0 0 0 0 0 0 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 2 2 2 2 2 2 1 1 1 1 1 1 0 0 0 0 0 0 1 1 1 1 1 1 3 3 3 3 3 3 3 3 3 3 3 3'.split(' ')]
+
+        print('\n'.join(map(str, forecast)))
+
+        # inside = Decimal('6.562')
+        buffer = get_buffer(
+            Decimal('2'), TempTs(temp=Decimal('-5.3'), ts=arrow.now()), Decimal(1), forecast_object(forecast))
+        assert_almost_equal(Decimal(buffer), Decimal(59))
 
     def test_buffer_and_target_inside_temp_equals(self):
         inside_temp = Decimal(2)
@@ -366,19 +382,19 @@ class TestGeneral:
 
     def test_temp_control_without_inside_temp(self):
         assert temp_control_without_inside_temp(Decimal(-2), Decimal('3.5')) == Decimal(8)
-        assert temp_control_without_inside_temp(Decimal(-7), Decimal(4)) == Decimal('10.93')
+        assert temp_control_without_inside_temp(Decimal(-7), Decimal(4)) == Decimal('8.83')
         assert temp_control_without_inside_temp(Decimal(-20), Decimal(4)) == Decimal(24)
 
     def test_get_next_command(self):
         assert get_next_command(True, Decimal(3), Decimal(-15), True, Decimal('3.5'), Decimal(9)) == Commands.heat8
         with freeze_time('2018-05-02T00:00:00+02:00'):  # Summer
-            assert get_next_command(False, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.heat16
+            assert get_next_command(False, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.heat10
             assert get_next_command(True, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.off
-            assert get_next_command(True, None, Decimal(-10), True, Decimal('3.5'), Decimal(9)) == Commands.heat16
+            assert get_next_command(True, None, Decimal(-10), True, Decimal('3.5'), Decimal(9)) == Commands.heat10
             assert get_next_command(True, None, Decimal('3.5'), True, Decimal('3.5'), Decimal(9)) == Commands.off
             assert get_next_command(True, Decimal('3.5'), Decimal(3), True, Decimal('3.5'), Decimal(7)) == Commands.off
         with freeze_time('2018-04-30T00:00:00+02:00'):
-            assert get_next_command(True, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.heat16
+            assert get_next_command(True, None, Decimal(-10), False, Decimal('3.5'), Decimal(9)) == Commands.heat10
 
     def test_get_error(self):
         assert get_error(Decimal(4), Decimal(5), Decimal('0.2')) == -Decimal('0.8')
