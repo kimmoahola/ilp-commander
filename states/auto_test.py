@@ -8,7 +8,7 @@ from freezegun import freeze_time
 
 import config
 from poller_helpers import Commands, TempTs, Forecast
-from states.auto import receive_ulkoilma_temperature, receive_wc_temperature, \
+from states.auto import receive_ulkoilma_temperature, receive_inside_temperature, \
     receive_fmi_temperature, Auto, target_inside_temperature, receive_yr_no_forecast, \
     RequestCache, receive_open_weather_map_temperature, get_buffer, make_forecast, get_temp_from_temp_api, \
     receive_fmi_forecast, forecast_mean_temperature, get_temp, get_forecast, get_outside, Controller, get_error, \
@@ -67,9 +67,9 @@ def mocker_init(mocker):
 
 def mock_inside(mocker, temp):
     if temp is not None:
-        mocker.patch('states.auto.receive_wc_temperature', return_value=(Decimal(temp), arrow.now().shift(minutes=-59)))
+        mocker.patch('states.auto.receive_inside_temperature', return_value=(Decimal(temp), arrow.now().shift(minutes=-59)))
     else:
-        mocker.patch('states.auto.receive_wc_temperature', return_value=(Decimal(500), arrow.now().shift(minutes=-60)))
+        mocker.patch('states.auto.receive_inside_temperature', return_value=(Decimal(500), arrow.now().shift(minutes=-60)))
 
 
 def mock_outside(mocker, temp, forecast_average=None):
@@ -124,9 +124,9 @@ class TestGeneral:
         assert temp == Decimal('8.187')
         assert ts == arrow.get('2017-10-01T16:20:26+00:00')
 
-    def test_receive_wc_temperature(self, mocker):
+    def test_receive_inside_temperature(self, mocker):
         mocker.patch('states.auto.get_temp_from_sheet', return_value=('8.187', '11.02.2018 klo 12:10'))
-        temp, ts = receive_wc_temperature()
+        temp, ts = receive_inside_temperature()
         assert temp == Decimal('8.187')
         assert ts == arrow.get('2018-02-11T10:10:00+00:00')
 

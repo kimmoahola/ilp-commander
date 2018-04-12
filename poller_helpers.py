@@ -380,14 +380,14 @@ def write_log_to_sheet(command: Command, extra_info: list):
 
 
 @timing
-def get_temp_from_sheet(sheet_index):
+def get_temp_from_sheet(sheet_title):
     sh = InitPygsheets.init_pygsheets()
 
     temp, ts = None, None
 
     if sh:
         try:
-            wks = sh[sheet_index]
+            wks = sh.worksheet_by_title(sheet_title)
             ts_and_temp = wks.range('B2:C2')[0]
             if len(ts_and_temp) == 2:
                 ts, temp = ts_and_temp

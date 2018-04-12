@@ -113,9 +113,9 @@ def receive_ulkoilma_temperature() -> (Optional[Decimal], Optional[arrow.Arrow])
 
 
 @timing
-@caching(cache_name='wc')
-def receive_wc_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
-    temp, ts = get_temp_from_sheet(sheet_index=3)
+@caching(cache_name='inside')
+def receive_inside_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
+    temp, ts = get_temp_from_sheet(sheet_title=config.INSIDE_SHEET_TITLE)
 
     if ts is not None and temp is not None:
         ts = arrow.get(ts, 'DD.MM.YYYY klo HH:mm').replace(tzinfo=tz.gettz(config.TIMEZONE))
@@ -844,7 +844,7 @@ class Auto(State):
         hyst = hysteresis()
         add_extra_info('Hysteresis: %s (%s)' % (decimal_round(hyst), decimal_round(target_inside_temp + hyst)))
 
-        inside_temp = get_temp([receive_wc_temperature])[0]
+        inside_temp = get_temp([receive_inside_temperature])[0]
         add_extra_info('Inside temperature: %s' % inside_temp)
 
         if inside_temp is not None and inside_temp > config.ALLOWED_MINIMUM_INSIDE_TEMP:
