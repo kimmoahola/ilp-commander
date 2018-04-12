@@ -6,6 +6,7 @@ SHEET_OAUTH_FILE = ''
 SHEET_KEY = ''
 MESSAGE_SHEET_INDEX = 4
 MESSAGE_SHEET_CELL = 'A1'
+INSIDE_SHEET_TITLE = 'some title'
 FMI_KEY = '12345678-1234-1234-1234-123456789012'
 FMI_LOCATION = 'tampere'
 OPEN_WEATHER_MAP_KEY = ''
@@ -19,7 +20,7 @@ CACHE_TIMES = {
         'if_ok': 25,
         'if_failed': 120,
     },
-    'wc': {
+    'inside': {
         'if_ok': 15,
         'if_failed': 120,
     },
