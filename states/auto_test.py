@@ -410,8 +410,10 @@ class TestGeneral:
         c = Controller(
             Decimal(3),
             Decimal(1) / Decimal(3600),
-            Decimal(3600) * Decimal(15),
-            Decimal(20))
+            Decimal(3600) * Decimal(15))
+
+        c.set_i_low_limit(-Decimal(20))
+        c.set_i_high_limit(Decimal(20))
 
         mocker.patch('time.time', return_value=0)
         assert c.update(Decimal(1))[0] == Decimal(3)
