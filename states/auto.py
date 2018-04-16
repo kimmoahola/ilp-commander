@@ -739,7 +739,6 @@ class Auto(State):
     last_command: Optional[Command] = None
     last_command_send_time = time.time()
     minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
-    hysteresis_going_up = False
     last_status_email_sent: Optional[str] = None
     controller = Controller(config.CONTROLLER_P, config.CONTROLLER_I, config.CONTROLLER_D)
 
@@ -747,7 +746,6 @@ class Auto(State):
     def clear():
         Auto.last_command: Optional[Command] = None  # Clear last command so Auto sends command after Manual
         Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
-        Auto.hysteresis_going_up = False
         Auto.controller.reset()
         Auto.last_status_email_sent = None
 
@@ -870,25 +868,9 @@ class Auto(State):
 
         add_extra_info('Controller: %s (%s)' % (decimal_round(target_from_controller, 2), controller_log))
 
-        if inside_temp is not None:
-            if inside_temp < target_inside_temp:
-                Auto.hysteresis_going_up = True
-            elif inside_temp > target_inside_temp + hyst:
-                Auto.hysteresis_going_up = False
-        else:
-            Auto.hysteresis_going_up = True
-
         next_command = get_next_command(
             valid_time, inside_temp, outside_temp_ts.temp, valid_outside, target_inside_temp,
             target_from_controller)
-
-        add_extra_info('Hysteresis going %s' % ('up' if Auto.hysteresis_going_up else 'down'))
-
-        if Auto.last_command is not None:
-            if Auto.hysteresis_going_up and next_command < Auto.last_command:
-                next_command = Auto.last_command
-            elif not Auto.hysteresis_going_up and next_command > Auto.last_command:
-                next_command = Auto.last_command
 
         Auto.handle_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp)
 
