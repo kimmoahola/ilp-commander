@@ -45,6 +45,10 @@ ALLOWED_MINIMUM_INSIDE_TEMP = Decimal(1)
 MINIMUM_INSIDE_TEMP = Decimal('3.5')
 COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF = Decimal('0.015')
 
+CONTROLLER_P = Decimal(2)
+CONTROLLER_I = Decimal(2) / Decimal(3600)
+CONTROLLER_D = Decimal(3600) * Decimal(25)
+
 
 def cooling_time_buffer_func(outside_temp):
     a = 0

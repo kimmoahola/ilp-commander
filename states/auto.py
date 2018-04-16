@@ -633,12 +633,12 @@ def get_error(target_inside_temp: Decimal, inside_temp: Optional[Decimal], hyst:
 
 
 class Controller:
-    def __init__(self, kp: Decimal, ki: Decimal, kd: Decimal, i_limit: Decimal):
+    def __init__(self, kp: Decimal, ki: Decimal, kd: Decimal):
         self.kp = kp
         self.ki = ki
         self.kd = kd
-        self.i_high_limit = i_limit
-        self.i_low_limit = -i_limit
+        self.i_high_limit = Decimal(0)
+        self.i_low_limit = Decimal(0)
         self.integral = Decimal(0)
         self.current_time: float = None
         self.past_errors: List[(Decimal, Decimal)] = []  # time and error
@@ -741,12 +741,7 @@ class Auto(State):
     minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
     hysteresis_going_up = False
     last_status_email_sent: Optional[str] = None
-
-    controller = Controller(
-        (Commands.heat30.temp - Decimal(15)) / (Decimal(15) - Decimal('3.5')),  # 1.304
-        Decimal(2) / Decimal(3600),
-        Decimal(3600) * Decimal(25),
-        Decimal(20))
+    controller = Controller(config.CONTROLLER_P, config.CONTROLLER_I, config.CONTROLLER_D)
 
     @staticmethod
     def clear():
