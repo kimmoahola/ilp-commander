@@ -19,6 +19,9 @@ from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_re
 from states import State
 
 
+PREDEFINED_OUTSIDE_TEMP = Decimal(-10)
+
+
 class RequestCache:
     _cache = {}
 
@@ -559,7 +562,7 @@ def get_outside(add_extra_info, mean_forecast):
             outside_temp = mean_forecast
             add_extra_info('Using mean forecast as outside temp: %s' % decimal_round(mean_forecast))
         else:
-            outside_temp = Decimal(-10)
+            outside_temp = PREDEFINED_OUTSIDE_TEMP
             add_extra_info('Using predefined outside temperature: %s' % outside_temp)
     else:
         valid_outside = True
