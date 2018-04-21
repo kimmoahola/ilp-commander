@@ -23,7 +23,7 @@ PREDEFINED_OUTSIDE_TEMP = Decimal(-10)
 
 
 class RequestCache:
-    _cache: Dict[str, Tuple[arrow, arrow, Any]] = {}
+    _cache: Dict[str, Tuple[arrow.Arrow, arrow.Arrow, Any]] = {}
 
     @classmethod
     def put(cls, name, stale_after_if_ok, stale_after_if_failed, content):
