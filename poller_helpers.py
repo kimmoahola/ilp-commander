@@ -9,7 +9,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from email.mime.text import MIMEText
 from functools import wraps, total_ordering
 from subprocess import Popen, PIPE
-from typing import NamedTuple, List, Optional
+from typing import NamedTuple, List, Optional, Tuple
 
 import arrow
 import itertools
@@ -35,7 +35,7 @@ Forecast = NamedTuple("Forecast", [('temps', List[TempTs]), ('ts', arrow.Arrow)]
 
 @total_ordering
 class Command:
-    def __init__(self, command_string: str, temp: Optional[Decimal]):
+    def __init__(self, command_string: str, temp: Optional[Decimal]) -> None:
         self.command_string = command_string
         self.temp = temp
 
@@ -260,7 +260,7 @@ def timing(f):
     return timing_wrap
 
 
-def get_most_recent_message(once=False):
+def get_most_recent_message(once=False) -> dict:
 
     logger.info('Start polling messages')
 
@@ -380,7 +380,7 @@ def write_log_to_sheet(command: Command, extra_info: list):
 
 
 @timing
-def get_temp_from_sheet(sheet_title):
+def get_temp_from_sheet(sheet_title) -> Tuple[Optional[Decimal], Optional[str]]:
     sh = InitPygsheets.init_pygsheets()
 
     temp, ts = None, None
