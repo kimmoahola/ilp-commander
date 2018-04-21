@@ -5,7 +5,7 @@ from decimal import Decimal
 from functools import wraps
 from json import JSONDecodeError
 from statistics import mean
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Dict, Any, Tuple
 
 import arrow
 import xmltodict
@@ -23,14 +23,14 @@ PREDEFINED_OUTSIDE_TEMP = Decimal(-10)
 
 
 class RequestCache:
-    _cache = {}
+    _cache: Dict[str, Tuple[arrow, arrow, Any]] = {}
 
     @classmethod
     def put(cls, name, stale_after_if_ok, stale_after_if_failed, content):
         cls._cache[name] = (stale_after_if_ok, stale_after_if_failed, content)
 
     @classmethod
-    def get(cls, name, stale_check='ok'):
+    def get(cls, name, stale_check='ok') -> Optional[Any]:
         if name in cls._cache:
             stale_after_if_ok, stale_after_if_failed, content = cls._cache[name]
 
@@ -81,7 +81,7 @@ def caching(cache_name):
     return caching_inner
 
 
-def get_temp_from_temp_api(host_and_port, table_name) -> (Optional[str], Optional[str]):
+def get_temp_from_temp_api(host_and_port, table_name) -> Tuple[Optional[Decimal], Optional[str]]:
     temp, ts = None, None
 
     try:
@@ -96,20 +96,19 @@ def get_temp_from_temp_api(host_and_port, table_name) -> (Optional[str], Optiona
             result_json = result.json()
             if 'ts' in result_json and 'temperature' in result_json:
                 ts = result_json['ts']
-                temp = result_json['temperature']
+                temp = Decimal(result_json['temperature'])
 
     return temp, ts
 
 
 @timing
 @caching(cache_name='ulkoilma')
-def receive_ulkoilma_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
+def receive_ulkoilma_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]:
     temp, ts = get_temp_from_temp_api(
         config.TEMP_API_OUTSIDE.get('host_and_port'), config.TEMP_API_OUTSIDE.get('table_name'))
 
-    if ts is not None and temp is not None:
+    if ts is not None:
         ts = arrow.get(ts).to(config.TIMEZONE)
-        temp = Decimal(temp)
 
     logger.info('temp:%s ts:%s', temp, ts)
     return temp, ts
@@ -117,12 +116,11 @@ def receive_ulkoilma_temperature() -> (Optional[Decimal], Optional[arrow.Arrow])
 
 @timing
 @caching(cache_name='inside')
-def receive_inside_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
+def receive_inside_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]:
     temp, ts = get_temp_from_sheet(sheet_title=config.INSIDE_SHEET_TITLE)
 
-    if ts is not None and temp is not None:
+    if ts is not None:
         ts = arrow.get(ts, 'DD.MM.YYYY klo HH:mm').replace(tzinfo=tz.gettz(config.TIMEZONE))
-        temp = Decimal(temp)
 
     logger.info('temp:%s ts:%s', temp, ts)
     return temp, ts
@@ -130,7 +128,7 @@ def receive_inside_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
 
 @timing
 @caching(cache_name='fmi')
-def receive_fmi_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
+def receive_fmi_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]:
     temp, ts = None, None
 
     try:
@@ -160,7 +158,7 @@ def receive_fmi_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
 
 @timing
 @caching(cache_name='open_weather_map')
-def receive_open_weather_map_temperature() -> (Optional[Decimal], Optional[arrow.Arrow]):
+def receive_open_weather_map_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]:
     temp, ts = None, None
 
     try:
@@ -183,7 +181,7 @@ def receive_open_weather_map_temperature() -> (Optional[Decimal], Optional[arrow
 
 @timing
 @caching(cache_name='yr.no')
-def receive_yr_no_forecast() -> (Optional[List[TempTs]], Optional[arrow.Arrow]):
+def receive_yr_no_forecast() -> Tuple[Optional[List[TempTs]], Optional[arrow.Arrow]]:
     temp, ts = None, None
 
     try:
@@ -227,7 +225,7 @@ def receive_yr_no_forecast() -> (Optional[List[TempTs]], Optional[arrow.Arrow]):
 
 @timing
 @caching(cache_name='fmi_forecast')
-def receive_fmi_forecast() -> (Optional[List[TempTs]], Optional[arrow.Arrow]):
+def receive_fmi_forecast() -> Tuple[Optional[List[TempTs]], Optional[arrow.Arrow]]:
     temp, ts = None, None
 
     try:
@@ -267,7 +265,7 @@ def receive_fmi_forecast() -> (Optional[List[TempTs]], Optional[arrow.Arrow]):
     return temp, ts
 
 
-def log_forecast(name, temp):
+def log_forecast(name, temp) -> None:
     temps = [t.temp for t in temp]
     if temps:
         forecast_hours = (temp[-1].ts - temp[0].ts).total_seconds() / 3600.0
@@ -278,7 +276,7 @@ def log_forecast(name, temp):
         logger.info('No forecast from %s')
 
 
-def forecast_mean_temperature(forecast: Forecast, hours: int = 24) -> Optional[Decimal]:
+def forecast_mean_temperature(forecast: Forecast, hours: Union[int, Decimal] = 24) -> Optional[Decimal]:
     if forecast and forecast.temps:
         return mean(t.temp for t in forecast.temps[:int(hours)])
     else:
@@ -628,7 +626,7 @@ def log_status(add_extra_info, valid_time: bool, forecast, valid_outside: bool, 
 def get_error(target_inside_temp: Decimal, inside_temp: Optional[Decimal], hyst: Decimal) -> Optional[Decimal]:
     if inside_temp is not None:
         error = target_inside_temp - inside_temp
-        error -= max([min([error, 0]), -hyst])
+        error -= max([min([error, Decimal(0)]), -hyst])
     else:
         error = None
 
@@ -636,7 +634,7 @@ def get_error(target_inside_temp: Decimal, inside_temp: Optional[Decimal], hyst:
 
 
 class Controller:
-    def __init__(self, kp: Decimal, ki: Decimal, kd: Decimal):
+    def __init__(self, kp: Decimal, ki: Decimal, kd: Decimal) -> None:
         self.kp = kp
         self.ki = ki
         self.kd = kd
@@ -644,12 +642,12 @@ class Controller:
         self.i_low_limit = Decimal(0)
         self.integral = Decimal(0)
         self.current_time: float = None
-        self.past_errors: List[(Decimal, Decimal)] = []  # time and error
+        self.past_errors: List[Tuple[Decimal, Decimal]] = []  # time and error
 
     def reset(self):
         self.integral = Decimal(0)
         self.current_time: float = None
-        self.past_errors: List[(Decimal, Decimal)] = []  # time and error
+        self.past_errors: List[Tuple[Decimal, Decimal]] = []  # time and error
 
     def is_reset(self):
         return self.current_time is None
@@ -683,17 +681,17 @@ class Controller:
         min_time = Decimal(60 * 30)  # 30 min
         if self.past_errors and self.past_errors[-1][0] - self.past_errors[0][0] < min_time:
             return Decimal(0)
-        n = len(self.past_errors)
-        sum_xy = sum(p[0] * p[1] for p in self.past_errors)
-        sum_x = sum(p[0] for p in self.past_errors)
-        sum_y = sum(p[1] for p in self.past_errors)
-        sum_x2 = sum(p[0] * p[0] for p in self.past_errors)
+        n = Decimal(len(self.past_errors))
+        sum_xy = Decimal(sum(p[0] * p[1] for p in self.past_errors))
+        sum_x = Decimal(sum(p[0] for p in self.past_errors))
+        sum_y = Decimal(sum(p[1] for p in self.past_errors))
+        sum_x2 = Decimal(sum(p[0] * p[0] for p in self.past_errors))
         divider = (n * sum_x2 - sum_x * sum_x)
         if divider == 0:
             return Decimal(0)
         return (n * sum_xy - sum_x * sum_y) / divider
 
-    def update(self, error: Optional[Decimal]) -> (Decimal, str):
+    def update(self, error: Optional[Decimal]) -> Tuple[Decimal, str]:
         if error is None:
             error = Decimal(0)
         else:
@@ -725,7 +723,8 @@ class Controller:
         logger.debug('controller p_term %.4f', p_term)
         logger.debug('controller i_term %.4f', i_term)
         logger.debug('controller d_term %.4f', d_term)
-        logger.debug('controller past errors %s', [(decimal_round(p[0]), decimal_round(p[1])) for p in self.past_errors])
+        past_errors_for_log = [(decimal_round(p[0]), decimal_round(p[1])) for p in self.past_errors]
+        logger.debug('controller past errors %s', past_errors_for_log)
 
         output = p_term + i_term + d_term
 
@@ -778,7 +777,7 @@ class Auto(State):
                     else:
                         Auto.controller.integral = Decimal(as_dict['json']['integral'])
 
-    def run(self, payload):
+    def run(self, payload) -> dict:
         if payload:
             if payload.get('param') and payload.get('param').get('min_inside_temp') is not None:
                 Auto.minimum_inside_temp = Decimal(payload.get('param').get('min_inside_temp'))
@@ -812,7 +811,7 @@ class Auto(State):
         return get_most_recent_message(once=True)
 
     @staticmethod
-    def process(minimum_inside_temp) -> (Command, list):
+    def process(minimum_inside_temp) -> Tuple[Command, list]:
         extra_info = []
 
         def add_extra_info(message):
