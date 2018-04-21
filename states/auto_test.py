@@ -115,17 +115,17 @@ class TestGeneral:
         mocker.patch('states.auto.get_url',
                      return_value=FakeResponse('{"id":118143,"ts":"2017-10-01T16:20:26+00:00","temperature":"8.187"}'))
         temp, ts = get_temp_from_temp_api('host_and_port', 'table_name')
-        assert temp == '8.187'
+        assert temp == Decimal('8.187')
         assert ts == '2017-10-01T16:20:26+00:00'
 
     def test_receive_ulkoilma_temperature(self, mocker):
-        mocker.patch('states.auto.get_temp_from_temp_api', return_value=('8.187', '2017-10-01T16:20:26+00:00'))
+        mocker.patch('states.auto.get_temp_from_temp_api', return_value=(Decimal('8.187'), '2017-10-01T16:20:26+00:00'))
         temp, ts = receive_ulkoilma_temperature()
         assert temp == Decimal('8.187')
         assert ts == arrow.get('2017-10-01T16:20:26+00:00')
 
     def test_receive_inside_temperature(self, mocker):
-        mocker.patch('states.auto.get_temp_from_sheet', return_value=('8.187', '11.02.2018 klo 12:10'))
+        mocker.patch('states.auto.get_temp_from_sheet', return_value=(Decimal('8.187'), '11.02.2018 klo 12:10'))
         temp, ts = receive_inside_temperature()
         assert temp == Decimal('8.187')
         assert ts == arrow.get('2018-02-11T10:10:00+00:00')

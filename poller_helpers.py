@@ -460,7 +460,7 @@ def get_list_of_first_timestamps(list_of_temps):
         return []
 
 
-def decimal_round(value, decimals=1):
+def decimal_round(value, decimals=1) -> Optional[Decimal]:
     if value is None:
         return None
 
