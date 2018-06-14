@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/termopetteri/ilp-commander.svg?branch=master)](https://travis-ci.org/termopetteri/ilp-commander)
+[![Build Status](https://travis-ci.org/kimmoahola/ilp-commander.svg?branch=master)](https://travis-ci.org/kimmoahola/ilp-commander)
 
 # Install
 
@@ -6,7 +6,7 @@
 
 - Install pyenv
 
-- `cd /home/pi && git clone https://github.com/termopetteri/ilp-commander.git`
+- `cd /home/pi && git clone https://github.com/kimmoahola/ilp-commander.git`
 
 - `cd ilp-commander`
 
