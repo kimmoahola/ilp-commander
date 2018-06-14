@@ -65,21 +65,21 @@ class Commands:
     heat18 = Command('heat_18__fan_high__swing_down', Decimal(18))
     heat20 = Command('heat_20__fan_high__swing_down', Decimal(20))
     heat22 = Command('heat_22__fan_high__swing_down', Decimal(22))
-    heat24 = Command('heat_24__fan_high__swing_down', Decimal(24))
-    heat26 = Command('heat_26__fan_high__swing_down', Decimal(26))
-    heat28 = Command('heat_28__fan_high__swing_down', Decimal(28))
-    heat30 = Command('heat_30__fan_high__swing_down', Decimal(30))
+    # heat24 = Command('heat_24__fan_high__swing_down', Decimal(24))
+    # heat26 = Command('heat_26__fan_high__swing_down', Decimal(26))
+    # heat28 = Command('heat_28__fan_high__swing_down', Decimal(28))
+    # heat30 = Command('heat_30__fan_high__swing_down', Decimal(30))
 
     @staticmethod
     def find_command_just_above_temp(temp: Decimal) -> Command:
-        if temp >= 28:
-            return Commands.heat30
-        if temp >= 26:
-            return Commands.heat28
-        if temp >= 24:
-            return Commands.heat26
-        if temp >= 22:
-            return Commands.heat24
+        # if temp >= 28:
+        #     return Commands.heat30
+        # if temp >= 26:
+        #     return Commands.heat28
+        # if temp >= 24:
+        #     return Commands.heat26
+        # if temp >= 22:
+        #     return Commands.heat24
         if temp >= 20:
             return Commands.heat22
         if temp >= 18:
@@ -107,16 +107,18 @@ class Commands:
             return Commands.heat18
         if temp < 22:
             return Commands.heat20
-        if temp < 24:
-            return Commands.heat22
-        if temp < 26:
-            return Commands.heat24
-        if temp < 28:
-            return Commands.heat26
-        if temp < 30:
-            return Commands.heat28
+        # if temp < 24:
+        #     return Commands.heat22
+        # if temp < 26:
+        #     return Commands.heat24
+        # if temp < 28:
+        #     return Commands.heat26
+        # if temp < 30:
+        #     return Commands.heat28
+        #
+        # return Commands.heat30
 
-        return Commands.heat30
+        return Commands.heat22
 
     @staticmethod
     def command_from_controller(value: Decimal) -> Command:

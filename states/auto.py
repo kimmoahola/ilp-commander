@@ -860,7 +860,7 @@ class Auto(State):
         Auto.controller.set_i_low_limit(lower_limit)
 
         i_high_limits = [
-            Commands.heat30.temp + Decimal('0.01'),
+            Commands.heat22.temp + Decimal('0.01'),
         ]
         Auto.controller.set_i_high_limit(min(i_high_limits) - target_inside_temp)
 
