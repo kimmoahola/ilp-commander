@@ -649,7 +649,7 @@ class Controller:
         self.current_time: float = None
         self.reset_past_errors()
 
-    def reset_past_errors():
+    def reset_past_errors(self):
         self.past_errors: List[Tuple[Decimal, Decimal]] = []  # time and error
 
     def is_reset(self):
