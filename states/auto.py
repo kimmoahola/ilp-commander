@@ -647,6 +647,9 @@ class Controller:
     def reset(self):
         self.integral = Decimal(0)
         self.current_time: float = None
+        self.reset_past_errors()
+
+    def reset_past_errors():
         self.past_errors: List[Tuple[Decimal, Decimal]] = []  # time and error
 
     def is_reset(self):
@@ -782,6 +785,10 @@ class Auto(State):
             if payload.get('param') and payload.get('param').get('min_inside_temp') is not None:
                 Auto.minimum_inside_temp = Decimal(payload.get('param').get('min_inside_temp'))
                 log_temp_info(Auto.minimum_inside_temp)
+
+                # Reset controller D term because otherwise after changing target the slope would be big
+                Auto.controller.reset_past_errors()
+
             else:
                 Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
 
