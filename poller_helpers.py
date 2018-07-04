@@ -65,10 +65,10 @@ class Commands:
     heat18 = Command('heat_18__fan_high__swing_down', Decimal(18))
     heat20 = Command('heat_20__fan_high__swing_down', Decimal(20))
     heat22 = Command('heat_22__fan_high__swing_down', Decimal(22))
-    # heat24 = Command('heat_24__fan_high__swing_down', Decimal(24))
-    # heat26 = Command('heat_26__fan_high__swing_down', Decimal(26))
-    # heat28 = Command('heat_28__fan_high__swing_down', Decimal(28))
-    # heat30 = Command('heat_30__fan_high__swing_down', Decimal(30))
+    heat24 = Command('heat_24__fan_high__swing_down', Decimal(24))
+    heat26 = Command('heat_26__fan_high__swing_down', Decimal(26))
+    heat28 = Command('heat_28__fan_high__swing_down', Decimal(28))
+    heat30 = Command('heat_30__fan_high__swing_down', Decimal(30))
 
     @staticmethod
     def find_command_just_above_temp(temp: Decimal) -> Command:
