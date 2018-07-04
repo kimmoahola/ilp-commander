@@ -609,7 +609,7 @@ def get_outside(add_extra_info, mean_forecast):
 
 def get_dew_point(add_extra_info):
     dew_point, ts = get_temp([receive_fmi_dew_point])
-    add_extra_info('Dew point: %s' % dew_point)
+    add_extra_info('Dew point: %s' % decimal_round(dew_point))
 
     return TempTs(temp=dew_point, ts=ts)
 
