@@ -1,5 +1,6 @@
 # coding=utf-8
 import json
+import math
 import time
 from decimal import Decimal
 from functools import wraps
@@ -786,6 +787,13 @@ class Controller:
             error, p_term, i_term, i_low_limit, i_high_limit, d_term, output)
 
 
+def estimate_temperature_with_rh(dew_point, rh):
+    a = Decimal('243.04')
+    b = Decimal('17.625')
+    rh_log = Decimal(math.log(rh))
+    return a * (((b * dew_point) / (a + dew_point)) - rh_log) / (b + rh_log - ((b * dew_point) / (a + dew_point)))
+
+
 class Auto(State):
     last_command: Optional[Command] = None
     last_command_send_time = time.time()
@@ -890,7 +898,11 @@ class Auto(State):
         dew_point = get_dew_point(add_extra_info)
 
         if dew_point.temp is not None:
-            target_inside_temp = max(target_inside_temp, dew_point.temp + 1)
+
+            min_temp_with_80_rh = estimate_temperature_with_rh(dew_point.temp, Decimal('0.8'))
+            add_extra_info('Temp with 80%% RH: %s' % decimal_round(min_temp_with_80_rh, 1))
+
+            target_inside_temp = max(target_inside_temp, min_temp_with_80_rh)
 
         add_extra_info('Target inside temperature: %s' % decimal_round(target_inside_temp, 1))
 
