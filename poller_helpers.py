@@ -121,7 +121,11 @@ class Commands:
         return Commands.heat22
 
     @staticmethod
-    def command_from_controller(value: Decimal) -> Command:
+    def command_from_controller(value: Decimal, target_inside_temp: Decimal) -> Command:
+
+        if value < target_inside_temp - Decimal(2):
+            return Commands.off
+
         # < 8 -> off
         # 8-10 -> 8
         # 10-13 -> 10
