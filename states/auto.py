@@ -629,7 +629,7 @@ def get_next_command(valid_time: bool,
                      target_from_controller: Decimal):
 
     if inside_temp is not None:
-        next_command = Commands.command_from_controller(target_from_controller)
+        next_command = Commands.command_from_controller(target_from_controller, target_inside_temp)
     else:
         is_summer = valid_time and 5 <= arrow.now().month <= 9
 
