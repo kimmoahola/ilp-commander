@@ -635,7 +635,7 @@ def get_next_command(valid_time: bool,
 
         if valid_outside and outside_temp < target_inside_temp or not valid_outside and not is_summer:
             control_without_inside = temp_control_without_inside_temp(outside_temp, target_inside_temp)
-            next_command = Commands.command_from_controller(control_without_inside)
+            next_command = Commands.command_from_controller(control_without_inside, target_inside_temp)
         else:
             next_command = Commands.off
 
