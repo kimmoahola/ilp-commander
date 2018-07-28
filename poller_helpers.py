@@ -72,14 +72,14 @@ class Commands:
 
     @staticmethod
     def find_command_just_above_temp(temp: Decimal) -> Command:
-        if temp >= 28:
-            return Commands.heat30
-        if temp >= 26:
-            return Commands.heat28
-        if temp >= 24:
-            return Commands.heat26
-        if temp >= 22:
-            return Commands.heat24
+        # if temp >= 28:
+        #     return Commands.heat30
+        # if temp >= 26:
+        #     return Commands.heat28
+        # if temp >= 24:
+        #     return Commands.heat26
+        # if temp >= 22:
+        #     return Commands.heat24
         if temp >= 20:
             return Commands.heat22
         if temp >= 18:
@@ -107,19 +107,25 @@ class Commands:
             return Commands.heat18
         if temp < 22:
             return Commands.heat20
-        if temp < 24:
-            return Commands.heat22
-        if temp < 26:
-            return Commands.heat24
-        if temp < 28:
-            return Commands.heat26
-        if temp < 30:
-            return Commands.heat28
+        # if temp < 24:
+        #     return Commands.heat22
+        # if temp < 26:
+        #     return Commands.heat24
+        # if temp < 28:
+        #     return Commands.heat26
+        # if temp < 30:
+        #     return Commands.heat28
+        #
+        # return Commands.heat30
 
-        return Commands.heat30
+        return Commands.heat22
 
     @staticmethod
-    def command_from_controller(value: Decimal) -> Command:
+    def command_from_controller(value: Decimal, target_inside_temp: Decimal) -> Command:
+
+        if value < target_inside_temp - Decimal(2):
+            return Commands.off
+
         # < 8 -> off
         # 8-10 -> 8
         # 10-13 -> 10

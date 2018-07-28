@@ -1,5 +1,6 @@
 # coding=utf-8
 import json
+import math
 import time
 from decimal import Decimal
 from functools import wraps
@@ -154,6 +155,45 @@ def receive_fmi_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]
 
     logger.info('temp:%s ts:%s', temp, ts)
     return temp, ts
+
+
+@timing
+@caching(cache_name='fmi dew point')
+def receive_fmi_dew_point() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]:
+    dew_points = []
+    ts = None
+
+    try:
+        starttime = arrow.now().shift(hours=-6).to('UTC').format('YYYY-MM-DDTHH:mm:ss') + 'Z'
+        result = get_url(
+            'http://data.fmi.fi/fmi-apikey/{key}/wfs?request=getFeature&storedquery_id=fmi::observations::weather'
+            '::simple&place={place}&parameters=td&starttime={starttime}'.format(
+                key=config.FMI_KEY, place=config.FMI_LOCATION, starttime=starttime))
+    except Exception as e:
+        logger.exception(e)
+    else:
+        if result.status_code != 200:
+            logger.error('%d: %s' % (result.status_code, result.content))
+        else:
+            try:
+                wfs_member = xmltodict.parse(result.content).get('wfs:FeatureCollection', {}).get('wfs:member')
+
+                for member in wfs_member:
+                    temp_data = member.get('BsWfs:BsWfsElement')
+                    if temp_data and 'BsWfs:Time' in temp_data and 'BsWfs:ParameterValue' in temp_data:
+                        ts = arrow.get(temp_data['BsWfs:Time']).to(config.TIMEZONE)
+                        dew_points.append(Decimal(temp_data['BsWfs:ParameterValue']))
+            except (KeyError, TypeError):
+                pass
+
+    if dew_points:
+        dew_point = sum(dew_points) / len(dew_points)
+    else:
+        dew_point = None
+        ts = None
+
+    logger.info('dew_point:%s ts:%s', dew_point, ts)
+    return dew_point, ts
 
 
 @timing
@@ -568,6 +608,13 @@ def get_outside(add_extra_info, mean_forecast):
     return TempTs(temp=outside_temp, ts=outside_ts), valid_outside
 
 
+def get_dew_point(add_extra_info):
+    dew_point, ts = get_temp([receive_fmi_dew_point])
+    add_extra_info('Dew point: %s' % decimal_round(dew_point))
+
+    return TempTs(temp=dew_point, ts=ts)
+
+
 def temp_control_without_inside_temp(outside_temp: Decimal, target_inside_temp: Decimal) -> Decimal:
     diff = abs(outside_temp - target_inside_temp)
     control = Decimal(3) + diff * diff * Decimal('0.03') + diff * Decimal('0.2')
@@ -582,13 +629,13 @@ def get_next_command(valid_time: bool,
                      target_from_controller: Decimal):
 
     if inside_temp is not None:
-        next_command = Commands.command_from_controller(target_from_controller)
+        next_command = Commands.command_from_controller(target_from_controller, target_inside_temp)
     else:
         is_summer = valid_time and 5 <= arrow.now().month <= 9
 
         if valid_outside and outside_temp < target_inside_temp or not valid_outside and not is_summer:
             control_without_inside = temp_control_without_inside_temp(outside_temp, target_inside_temp)
-            next_command = Commands.command_from_controller(control_without_inside)
+            next_command = Commands.command_from_controller(control_without_inside, target_inside_temp)
         else:
             next_command = Commands.off
 
@@ -647,6 +694,9 @@ class Controller:
     def reset(self):
         self.integral = Decimal(0)
         self.current_time: float = None
+        self.reset_past_errors()
+
+    def reset_past_errors(self):
         self.past_errors: List[Tuple[Decimal, Decimal]] = []  # time and error
 
     def is_reset(self):
@@ -737,6 +787,13 @@ class Controller:
             error, p_term, i_term, i_low_limit, i_high_limit, d_term, output)
 
 
+def estimate_temperature_with_rh(dew_point, rh):
+    a = Decimal('243.04')
+    b = Decimal('17.625')
+    rh_log = Decimal(math.log(rh))
+    return a * (((b * dew_point) / (a + dew_point)) - rh_log) / (b + rh_log - ((b * dew_point) / (a + dew_point)))
+
+
 class Auto(State):
     last_command: Optional[Command] = None
     last_command_send_time = time.time()
@@ -782,6 +839,10 @@ class Auto(State):
             if payload.get('param') and payload.get('param').get('min_inside_temp') is not None:
                 Auto.minimum_inside_temp = Decimal(payload.get('param').get('min_inside_temp'))
                 log_temp_info(Auto.minimum_inside_temp)
+
+                # Reset controller D term because otherwise after changing target the slope would be big
+                Auto.controller.reset_past_errors()
+
             else:
                 Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
 
@@ -834,6 +895,15 @@ class Auto(State):
                                                        minimum_inside_temp,
                                                        forecast)
 
+        dew_point = get_dew_point(add_extra_info)
+
+        if dew_point.temp is not None:
+
+            min_temp_with_80_rh = estimate_temperature_with_rh(dew_point.temp, Decimal('0.8'))
+            add_extra_info('Temp with 80%% RH: %s' % decimal_round(min_temp_with_80_rh, 1))
+
+            target_inside_temp = max(target_inside_temp, min_temp_with_80_rh)
+
         add_extra_info('Target inside temperature: %s' % decimal_round(target_inside_temp, 1))
 
         hyst = hysteresis()
@@ -860,7 +930,7 @@ class Auto(State):
         Auto.controller.set_i_low_limit(lower_limit)
 
         i_high_limits = [
-            Commands.heat30.temp + Decimal('0.01'),
+            Commands.heat22.temp + Decimal('0.01'),
         ]
         Auto.controller.set_i_high_limit(min(i_high_limits) - target_inside_temp)
 
