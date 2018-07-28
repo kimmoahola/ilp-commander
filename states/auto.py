@@ -768,7 +768,8 @@ class Controller:
 
         i_term = self.integral
 
-        d_term = self.kd * self._past_error_slope()
+        error_slope = self._past_error_slope()
+        d_term = self.kd * error_slope
 
         logger.debug('controller p_term %.4f', p_term)
         logger.debug('controller i_term %.4f', i_term)
@@ -779,12 +780,12 @@ class Controller:
         output = p_term + i_term + d_term
 
         logger.debug('controller output %.4f', output)
-        return output, self.log(error, p_term, i_term, d_term, self.i_low_limit, self.i_high_limit, output)
+        return output, self.log(error, p_term, i_term, d_term, error_slope, self.i_low_limit, self.i_high_limit, output)
 
     @staticmethod
-    def log(error, p_term, i_term, d_term, i_low_limit, i_high_limit, output) -> str:
-        return 'e %.2f, p %.2f, i %.2f (%.2f-%.2f), d %.2f, out %.2f' % (
-            error, p_term, i_term, i_low_limit, i_high_limit, d_term, output)
+    def log(error, p_term, i_term, d_term, error_slope, i_low_limit, i_high_limit, output) -> str:
+        return 'e %.2f, p %.2f, i %.2f (%.2f-%.2f), d %.2f slope %.2f, out %.2f' % (
+            error, p_term, i_term, i_low_limit, i_high_limit, d_term, error_slope * Decimal(3600), output)
 
 
 def estimate_temperature_with_rh(dew_point, rh):
@@ -924,8 +925,13 @@ class Auto(State):
 
         error = get_error(target_inside_temp, inside_temp, hyst)
 
-        degrees_per_hour_slope = Decimal('0.1') / Decimal(3600)
-        min_correction_temp = Commands.heat8.temp - Decimal('0.01') - degrees_per_hour_slope * Auto.controller.kd
+        degrees_per_hour_slope = Decimal('0.2') / Decimal(3600)
+
+        command_below_target = Commands.find_command_at_or_just_below_temp(target_inside_temp)
+        if command_below_target == Commands.off:
+            command_below_target = Commands.heat8
+
+        min_correction_temp = command_below_target.temp - Decimal('0.01') - degrees_per_hour_slope * Auto.controller.kd
         lower_limit = min_correction_temp - target_inside_temp
         Auto.controller.set_i_low_limit(lower_limit)
 
