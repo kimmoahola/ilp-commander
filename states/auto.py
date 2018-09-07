@@ -927,7 +927,7 @@ class Auto(State):
 
         degrees_per_hour_slope = Decimal('0.2') / Decimal(3600)
 
-        Auto.controller.set_i_low_limit(degrees_per_hour_slope * Auto.controller.kd)
+        Auto.controller.set_i_low_limit(-degrees_per_hour_slope * Auto.controller.kd)
 
         i_high_limits = [
             Commands.heat22.temp + Decimal('0.01'),
