@@ -837,13 +837,13 @@ class Auto(State):
 
     def run(self, payload) -> dict:
         if payload:
+
+            # Reset controller D term because otherwise after changing target the slope would be big
+            Auto.controller.reset_past_errors()
+
             if payload.get('param') and payload.get('param').get('min_inside_temp') is not None:
                 Auto.minimum_inside_temp = Decimal(payload.get('param').get('min_inside_temp'))
                 log_temp_info(Auto.minimum_inside_temp)
-
-                # Reset controller D term because otherwise after changing target the slope would be big
-                Auto.controller.reset_past_errors()
-
             else:
                 Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
 
