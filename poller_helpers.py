@@ -123,7 +123,7 @@ class Commands:
     @staticmethod
     def command_from_controller(value: Decimal, target_inside_temp: Decimal) -> Command:
 
-        if value < target_inside_temp - Decimal(2):
+        if value < target_inside_temp:
             return Commands.off
 
         # < 8 -> off

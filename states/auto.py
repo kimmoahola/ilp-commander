@@ -927,13 +927,7 @@ class Auto(State):
 
         degrees_per_hour_slope = Decimal('0.2') / Decimal(3600)
 
-        command_below_target = Commands.find_command_at_or_just_below_temp(target_inside_temp)
-        if command_below_target == Commands.off:
-            command_below_target = Commands.heat8
-
-        min_correction_temp = command_below_target.temp - Decimal('0.01') - degrees_per_hour_slope * Auto.controller.kd
-        lower_limit = min_correction_temp - target_inside_temp
-        Auto.controller.set_i_low_limit(lower_limit)
+        Auto.controller.set_i_low_limit(degrees_per_hour_slope * Auto.controller.kd)
 
         i_high_limits = [
             Commands.heat22.temp + Decimal('0.01'),
