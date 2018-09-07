@@ -370,7 +370,7 @@ def get_message_from_sheet() -> str:
 @timing
 def write_log_to_sheet(command: Command, extra_info: list):
     sh = InitPygsheets.init_pygsheets()
-    cell = 'B1'
+    cell = 'B2'
 
     msg = '\n'.join([str(command), time_str()] + extra_info)
 
