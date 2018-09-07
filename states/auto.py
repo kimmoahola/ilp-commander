@@ -164,7 +164,7 @@ def receive_fmi_dew_point() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]:
     ts = None
 
     try:
-        starttime = arrow.now().shift(hours=-6).to('UTC').format('YYYY-MM-DDTHH:mm:ss') + 'Z'
+        starttime = arrow.now().shift(hours=-12).to('UTC').format('YYYY-MM-DDTHH:mm:ss') + 'Z'
         result = get_url(
             'http://data.fmi.fi/fmi-apikey/{key}/wfs?request=getFeature&storedquery_id=fmi::observations::weather'
             '::simple&place={place}&parameters=td&starttime={starttime}'.format(
