@@ -853,15 +853,16 @@ class Auto(State):
 
         next_command, extra_info = self.process(minimum_inside_temp)
 
+        seconds_since_last_command = time.time() - Auto.last_command_send_time
+
         if Auto.last_command is not None:
-            logger.debug('Last auto command sent %d minutes ago', (time.time() - Auto.last_command_send_time) / 60.0)
+            logger.debug('Last auto command sent %d minutes ago', seconds_since_last_command / 60.0)
 
         # Send command every now and then even if command has not changed
-        force_send_command_time = 60 * 60 * 24
+        force_send_command_time = 60 * 60
 
         if Auto.last_command is None or \
-                Auto.last_command != next_command or \
-                time.time() - Auto.last_command_send_time > force_send_command_time:
+                next_command > Auto.last_command or (next_command < Auto.last_command and seconds_since_last_command > force_send_command_time):
             Auto.last_command = next_command
             Auto.last_command_send_time = time.time()
             send_ir_signal(next_command, extra_info=extra_info)

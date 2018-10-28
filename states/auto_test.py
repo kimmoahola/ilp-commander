@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import time
 from decimal import Decimal
 
 import arrow
@@ -470,13 +471,15 @@ class TestAuto:
         auto = Auto()
         auto.run({'command': 'auto', 'param': {'min_inside_temp': 18}})
         assert mock_send_ir_signal.call_count == 1
-        assert mock_send_ir_signal.call_args[0][0] == Commands.heat30
+        assert mock_send_ir_signal.call_args[0][0] == Commands.heat22
 
         auto.run({})
-        assert_ir_call(mock_send_ir_signal, Commands.heat30)
+        assert_ir_call(mock_send_ir_signal, Commands.heat22)
         assert mock_send_ir_signal.call_count == 1
-        assert mock_send_ir_signal.call_args[0][0] == Commands.heat30
+        assert mock_send_ir_signal.call_args[0][0] == Commands.heat22
 
+        new_time = time.time() + 3600
+        mocker.patch('time.time', return_value=new_time)
         auto.run({'command': 'auto', 'param': None})
         assert mock_send_ir_signal.call_count == 2
         assert mock_send_ir_signal.call_args[0][0] == Commands.off

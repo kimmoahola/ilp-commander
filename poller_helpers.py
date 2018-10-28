@@ -43,10 +43,12 @@ class Command:
         return self.temp == other.temp
 
     def __lt__(self, other):
-        if self.temp is None:
-            return True
+        if self.temp is None and other.temp is None:
+            return False
         elif other.temp is None:
             return False
+        elif self.temp is None:
+            return True
         else:
             return self.temp < other.temp
 
