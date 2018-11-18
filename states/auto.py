@@ -158,7 +158,7 @@ def receive_fmi_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]
 
 
 @timing
-@caching(cache_name='fmi dew point')
+@caching(cache_name='fmi_dew_point')
 def receive_fmi_dew_point() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]:
     dew_points = []
     ts = None
@@ -609,7 +609,7 @@ def get_outside(add_extra_info, mean_forecast):
 
 
 def get_dew_point(add_extra_info):
-    dew_point, ts = get_temp([receive_fmi_dew_point])
+    dew_point, ts = get_temp([receive_fmi_dew_point], max_ts_diff=6 * 60)
     add_extra_info('Dew point: %s' % decimal_round(dew_point))
 
     return TempTs(temp=dew_point, ts=ts)
