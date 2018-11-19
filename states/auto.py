@@ -150,6 +150,8 @@ def receive_fmi_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]
                 if temp_data and 'BsWfs:Time' in temp_data and 'BsWfs:ParameterValue' in temp_data:
                     ts = arrow.get(temp_data['BsWfs:Time']).to(config.TIMEZONE)
                     temp = Decimal(temp_data['BsWfs:ParameterValue'])
+                    if not temp.is_finite():
+                        raise TypeError()
             except (KeyError, TypeError):
                 temp, ts = None, None
 
