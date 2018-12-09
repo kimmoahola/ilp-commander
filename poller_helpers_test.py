@@ -4,7 +4,7 @@ from decimal import Decimal
 from freezegun import freeze_time
 
 import config
-from poller_helpers import median, send_ir_signal, Commands, log_temp_info, TempTs
+from poller_helpers import median, send_ir_signal, Commands, TempTs
 
 
 def test_median():
@@ -83,7 +83,3 @@ def test_command():
     assert not Commands.off > Commands.off
     assert not Commands.off != Commands.off
     assert Commands.off == Commands.off
-
-
-def test_log_temp_info():
-    log_temp_info(config.MINIMUM_INSIDE_TEMP)

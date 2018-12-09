@@ -11,7 +11,7 @@ import config
 from poller_helpers import Commands, TempTs, Forecast
 from states.auto import receive_ulkoilma_temperature, receive_inside_temperature, \
     receive_fmi_temperature, Auto, target_inside_temperature, receive_yr_no_forecast, \
-    RequestCache, receive_open_weather_map_temperature, get_buffer, make_forecast, get_temp_from_temp_api, \
+    RequestCache, receive_open_weather_map_temperature, make_forecast, get_temp_from_temp_api, \
     receive_fmi_forecast, forecast_mean_temperature, get_temp, get_forecast, get_outside, Controller, get_error, \
     temp_control_without_inside_temp, get_next_command, PREDEFINED_OUTSIDE_TEMP
 
@@ -261,89 +261,6 @@ class TestGeneral:
         assert_almost_equal(
             target_inside_temperature(lambda x: None, TempTs(temp=Decimal('-5.3'), ts=arrow.now()), Decimal(1), Decimal('3.5'), forecast_object(forecast), Decimal('31.3')),
             Decimal('6.2'))
-
-    def test_get_buffer(self):
-        forecast = [
-            -20,
-            20,
-            -20,
-        ]
-        buffer = get_buffer(
-            Decimal(2), TempTs(temp=Decimal(1), ts=arrow.now()), Decimal(1), forecast_object(forecast))
-        assert_almost_equal(Decimal(buffer), Decimal(13))
-
-        forecast = [
-            '1.01',
-            '1.01',
-            '1.01',
-            '1.01',
-            '1.01',
-        ]
-        buffer = get_buffer(
-            Decimal(1), TempTs(temp=Decimal(1), ts=arrow.now()), Decimal(1), forecast_object(forecast))
-        assert_almost_equal(Decimal(buffer), Decimal('Infinity'))
-
-        forecast = [
-            -20,
-            20,
-            -20,
-            -20,
-            20,
-            20,
-            -20,
-        ]
-        buffer = get_buffer(
-            Decimal(3), TempTs(temp=Decimal(-5), ts=arrow.now()), Decimal(1), forecast_object(forecast))
-        assert_almost_equal(Decimal(buffer), Decimal(29))
-
-        # 2018-03-07 17:30:58,568
-        forecast = [Decimal(d) for d in '-7.65 -7.85 -7.45 -8.0 -8.05 -8.15 -8.25 -8.8 -8.95 -9.05 -9.15 -9.25 -9.85 -9.95 -10.05 -9.4 -9.1 -8.2 -7.3 -6.4 -6.0 -5.35 -5.35 -6.0 -6.2 -7.0 -7.15 -7.2 -7.25 -7.2 -7.1 -7.05 -6.85 -6.7 -6.55 -5.9 -5.75 -5.65 -5.5 -4.8 -3.9 -3.6 -2.95 -2.7 -2.0 -1.9 -1.75 -1.7 -2.45 -2.6 -2.7 -2.75 -2.85 -2.9 -3.1 -4.45 -4.8 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -1 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2 -2 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 -5 0 0 0 0 0 0 -2 -2 -2 -2 -2 -2 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 1 1 1 1 1 1 -1 -1 -1 -1 -1 -1 -3 -3 -3 -3 -3 -3 -5 -5 -5 -5 -5 -5 -1 -1 -1 -1 -1 -1 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 -3 1 1 1 1 1 1 0 0 0 0 0 0 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 2 2 2 2 2 2 1 1 1 1 1 1 0 0 0 0 0 0 1 1 1 1 1 1 3 3 3 3 3 3 3 3 3 3 3 3'.split(' ')]
-
-        print('\n'.join(map(str, forecast)))
-
-        # inside = Decimal('6.562')
-        buffer = get_buffer(
-            Decimal('2'), TempTs(temp=Decimal('-5.3'), ts=arrow.now()), Decimal(1), forecast_object(forecast))
-        assert_almost_equal(Decimal(buffer), Decimal(59))
-
-    def test_buffer_and_target_inside_temp_equals(self):
-        inside_temp = Decimal(2)
-        forecast = [
-            -20,
-            -10,
-        ] * 100
-        buffer = get_buffer(
-            inside_temp,
-            TempTs(temp=Decimal(-10), ts=arrow.now()),
-            Decimal(1),
-            forecast_object(forecast))
-        target = target_inside_temperature(lambda x: None,
-                                           TempTs(temp=Decimal(-10), ts=arrow.now()),
-                                           Decimal(1),
-                                           Decimal(-100),
-                                           forecast_object(forecast),
-                                           buffer)
-        assert_almost_equal(target, inside_temp)
-        assert_almost_equal(target, Decimal(2))
-
-        inside_temp = Decimal(8)
-        forecast = [
-            -5,
-        ] * 10
-        buffer = get_buffer(
-            inside_temp,
-            TempTs(temp=Decimal(-10), ts=arrow.now()),
-            Decimal(1),
-            forecast_object(forecast))
-        target = target_inside_temperature(lambda x: None,
-                                           TempTs(temp=Decimal(-10), ts=arrow.now()),
-                                           Decimal(1),
-                                           Decimal(-100),
-                                           forecast_object(forecast),
-                                           buffer)
-
-        assert_almost_equal(target, inside_temp)
-        assert_almost_equal(target, Decimal('7.9'))
 
     def test_get_forecast(self, mocker):
         temps1 = [TempTs(temp=Decimal('-4.5'), ts=arrow.get('2018-02-11T18:00:00+02:00')),

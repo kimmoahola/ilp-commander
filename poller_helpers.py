@@ -483,24 +483,6 @@ def decimal_round(value, decimals=1) -> Optional[Decimal]:
     return value.quantize(Decimal(rounder), rounding=ROUND_HALF_UP)
 
 
-def log_temp_info(minimum_inside_temp):
-    from states.auto import target_inside_temperature, get_buffer
-
-    for outside_temp in range(-20, int(minimum_inside_temp + 2), 1):
-        outside_temp_ts = TempTs(Decimal(outside_temp), arrow.now())
-
-        target_inside_temp = target_inside_temperature(
-            lambda x: None, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, minimum_inside_temp, None)
-
-        buffer = get_buffer(target_inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, None)
-
-        logger.info(
-            'Target inside is %5.2f when forecast mean is %5.1f. Buffer %s h.',
-            target_inside_temp,
-            outside_temp,
-            buffer)
-
-
 def have_valid_time(wait_time=30) -> bool:
 
     if 'windows' in platform.system().lower():

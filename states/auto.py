@@ -15,7 +15,7 @@ from pony import orm
 
 import config
 from poller_helpers import Commands, logger, send_ir_signal, timing, get_most_recent_message, get_temp_from_sheet, \
-    median, get_url, time_str, write_log_to_sheet, TempTs, Forecast, decimal_round, have_valid_time, log_temp_info, \
+    median, get_url, time_str, write_log_to_sheet, TempTs, Forecast, decimal_round, have_valid_time, \
     SavedState, Command, email
 from states import State
 
@@ -473,102 +473,6 @@ def cooling_time_buffer_resolved(cooling_time_buffer, outside_temp, forecast: Un
         return buffer
 
 
-def get_buffer(inside_temp: Decimal, outside_temp_ts: TempTs, allowed_min_inside_temp: Decimal,
-               forecast: Union[Forecast, None]) -> Decimal:
-    buffer = Decimal(0)  # hours
-
-    # from pprint import pprint
-
-    # if forecast and forecast.temps:
-    #     # forecast = forecast[0]  # remove fetch timestamp
-    #     # if forecast:
-    #     forecast = [(outside_temp, None)] + [f for f in forecast if f[1] > arrow.now()]
-
-    valid_forecast = [outside_temp_ts]
-
-    if forecast and forecast.temps:
-        for f in forecast.temps:
-            if f.ts > valid_forecast[-1].ts:
-                valid_forecast.append(f)
-
-    # TODO: sort by ts
-
-    # pprint(valid_forecast)
-
-    inside_ts = arrow.now().shift(minutes=-5)
-
-    iteration_inside_temp = inside_temp
-    # iteration_hours = Decimal(0)
-    iteration_temp_ts = None  # TODO: inside timestamp
-
-    for vf in valid_forecast:
-
-        if iteration_temp_ts is None:
-            # First round: from inside ts to second forecast ts using the first forecast temp
-            iteration_temp_ts = TempTs(temp=vf.temp, ts=inside_ts)
-        else:
-            this_iteration_hours = Decimal((vf.ts - iteration_temp_ts.ts).total_seconds() / 3600.0)
-            inside_outside_diff = iteration_inside_temp - iteration_temp_ts.temp
-            temp_drop = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * inside_outside_diff * this_iteration_hours
-            if iteration_inside_temp - temp_drop < allowed_min_inside_temp:
-                this_iteration_hours *= (iteration_inside_temp - allowed_min_inside_temp) / temp_drop
-                temp_drop = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * inside_outside_diff * this_iteration_hours
-
-            # from pprint import pprint
-            # pprint({
-            #     'buffer': buffer,
-            #     'iteration_inside_temp': iteration_inside_temp,
-            #     'vf': vf,
-            #     'iteration_temp_ts': iteration_temp_ts,
-            #     'temp_drop': temp_drop,
-            #     'this_iteration_hours': this_iteration_hours,
-            # })
-            # print('-' * 50)
-
-            iteration_inside_temp -= temp_drop
-            iteration_temp_ts = vf
-            buffer += this_iteration_hours
-        # print('1' * 50)
-
-    # if valid_forecast:
-    outside_after_forecast = mean(t.temp for t in valid_forecast)
-
-    # print('outside_after_forecast', outside_after_forecast)
-    # print('buffer', buffer)
-
-    if outside_after_forecast < allowed_min_inside_temp:
-        while (iteration_inside_temp - Decimal('0.001')) > allowed_min_inside_temp:
-            this_iteration_hours = Decimal(1)
-            inside_outside_diff = iteration_inside_temp - outside_after_forecast
-            temp_drop = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * inside_outside_diff * this_iteration_hours
-            if iteration_inside_temp - temp_drop < allowed_min_inside_temp:
-                this_iteration_hours *= (iteration_inside_temp - allowed_min_inside_temp) / temp_drop
-                temp_drop = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * inside_outside_diff * this_iteration_hours
-
-            # from pprint import pprint
-            # pprint({
-            #     'buffer': buffer,
-            #     'iteration_inside_temp': iteration_inside_temp,
-            #     'iteration_temp_ts': iteration_temp_ts,
-            #     'temp_drop': temp_drop,
-            #     'this_iteration_hours': this_iteration_hours,
-            # })
-            # print('-' * 50)
-
-            iteration_inside_temp -= temp_drop
-            buffer += this_iteration_hours
-    else:
-        buffer = 'inf'
-
-    if buffer == 0:
-        # TODO: kun buffer on oikeasti nolla, niin palauta nolla
-        buffer = 'inf'
-    elif isinstance(buffer, Decimal):
-        buffer = decimal_round(buffer, 0)
-
-    return buffer
-
-
 def hysteresis() -> Decimal:
     return Decimal('0.2')
 
@@ -845,7 +749,6 @@ class Auto(State):
 
             if payload.get('param') and payload.get('param').get('min_inside_temp') is not None:
                 Auto.minimum_inside_temp = Decimal(payload.get('param').get('min_inside_temp'))
-                log_temp_info(Auto.minimum_inside_temp)
             else:
                 Auto.minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
 
@@ -915,16 +818,6 @@ class Auto(State):
 
         inside_temp = get_temp([receive_inside_temperature])[0]
         add_extra_info('Inside temperature: %s' % inside_temp)
-
-        if inside_temp is not None and inside_temp > config.ALLOWED_MINIMUM_INSIDE_TEMP:
-            buffer = get_buffer(inside_temp, outside_temp_ts, config.ALLOWED_MINIMUM_INSIDE_TEMP, forecast)
-            if buffer is not None:
-                if isinstance(buffer, (int, Decimal)):
-                    ts = time_str(arrow.utcnow().shift(hours=float(buffer)))
-                else:
-                    ts = ''
-                add_extra_info('Current buffer: %s h (%s) to temp %s C' % (
-                    buffer, ts, config.ALLOWED_MINIMUM_INSIDE_TEMP))
 
         error = get_error(target_inside_temp, inside_temp, hyst)
 
