@@ -659,10 +659,18 @@ class Controller:
 
         new_time = time.time()
 
+        error_slope = self._past_error_slope()
+
         if self.current_time is not None:
             delta_time = Decimal(new_time - self.current_time)
             logger.debug('controller delta_time %.4f', delta_time)
-            self.integral += self.ki * error * delta_time
+
+            if error > 0 and error_slope >= Decimal('-0.1') or error < 0 and error_slope <= 0:
+                integral_update_value = self.ki * error * delta_time
+                logger.info('Updating integral with %.4f', integral_update_value)
+                self.integral += integral_update_value
+            else:
+                logger.info('Not updating integral')
 
         self.current_time = new_time
 
@@ -674,7 +682,6 @@ class Controller:
 
         i_term = self.integral
 
-        error_slope = self._past_error_slope()
         d_term = self.kd * error_slope
 
         logger.debug('controller p_term %.4f', p_term)
