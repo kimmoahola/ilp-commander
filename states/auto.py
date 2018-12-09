@@ -770,14 +770,17 @@ class Auto(State):
         if Auto.last_command is not None:
             logger.debug('Last auto command sent %d minutes ago', seconds_since_last_command / 60.0)
 
-        # Send command every now and then even if command has not changed
-        force_send_command_time = 60 * 60
+        min_time_heating = 60 * 60 * 6
 
         if Auto.last_command is None or \
-                next_command > Auto.last_command or (next_command < Auto.last_command and seconds_since_last_command > force_send_command_time):
+                (next_command != Auto.last_command and (
+                    next_command != Commands.off or
+                    next_command == Commands.off and seconds_since_last_command > min_time_heating)):
             Auto.last_command = next_command
             Auto.last_command_send_time = time.time()
             send_ir_signal(next_command, extra_info=extra_info)
+
+        extra_info.append('Actual last command: %s' % Auto.last_command)
 
         write_log_to_sheet(next_command, extra_info=extra_info)
 
