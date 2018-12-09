@@ -97,8 +97,6 @@ class Commands:
 
     @staticmethod
     def find_command_at_or_just_below_temp(temp: Decimal) -> Command:
-        if temp < 8:
-            return Commands.off
         if temp < 10:
             return Commands.heat8
         if temp < 16:
