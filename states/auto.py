@@ -486,7 +486,7 @@ def get_forecast(add_extra_info, valid_time):
         forecast = None
         logger.debug('Forecast %s', forecast)
     mean_forecast = forecast_mean_temperature(forecast)
-    add_extra_info('Forecast mean: %s' % decimal_round(mean_forecast))
+    add_extra_info('Forecast 24 h mean: %s' % decimal_round(mean_forecast))
     return forecast, mean_forecast
 
 
