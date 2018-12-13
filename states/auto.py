@@ -633,7 +633,7 @@ class Controller:
             if past_error[0] >= past_error_time_limit
         ]
 
-    def _past_error_slope(self) -> Decimal:
+    def _past_error_slope_per_second(self) -> Decimal:
         min_time = Decimal(60 * 30)  # 30 min
         if self.past_errors and self.past_errors[-1][0] - self.past_errors[0][0] < min_time:
             return Decimal(0)
@@ -659,13 +659,14 @@ class Controller:
 
         new_time = time.time()
 
-        error_slope = self._past_error_slope()
+        error_slope_per_second = self._past_error_slope_per_second()
+        error_slope_per_hour = error_slope_per_second * Decimal(3600)
 
         if self.current_time is not None:
             delta_time = Decimal(new_time - self.current_time)
             logger.debug('controller delta_time %.4f', delta_time)
 
-            if error > 0 and error_slope >= Decimal('-0.1') or error < 0 and error_slope <= 0:
+            if error > 0 and error_slope_per_hour >= Decimal('-0.05') or error < 0 and error_slope_per_hour <= 0:
                 integral_update_value = self.ki * error * delta_time
                 logger.info('Updating integral with %.4f', integral_update_value)
                 self.integral += integral_update_value
@@ -682,7 +683,7 @@ class Controller:
 
         i_term = self.integral
 
-        d_term = self.kd * error_slope
+        d_term = self.kd * error_slope_per_second
 
         logger.debug('controller p_term %.4f', p_term)
         logger.debug('controller i_term %.4f', i_term)
@@ -693,12 +694,12 @@ class Controller:
         output = p_term + i_term + d_term
 
         logger.debug('controller output %.4f', output)
-        return output, self.log(error, p_term, i_term, d_term, error_slope, self.i_low_limit, self.i_high_limit, output)
+        return output, self.log(error, p_term, i_term, d_term, error_slope_per_hour, self.i_low_limit, self.i_high_limit, output)
 
     @staticmethod
-    def log(error, p_term, i_term, d_term, error_slope, i_low_limit, i_high_limit, output) -> str:
+    def log(error, p_term, i_term, d_term, error_slope_per_hour, i_low_limit, i_high_limit, output) -> str:
         return 'e %.2f, p %.2f, i %.2f (%.2f-%.2f), d %.2f slope %.2f, out %.2f' % (
-            error, p_term, i_term, i_low_limit, i_high_limit, d_term, error_slope * Decimal(3600), output)
+            error, p_term, i_term, i_low_limit, i_high_limit, d_term, error_slope_per_hour, output)
 
 
 def estimate_temperature_with_rh(dew_point, rh):
