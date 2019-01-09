@@ -73,70 +73,34 @@ class Commands:
     heat30 = Command('heat_30__fan_high__swing_down', Decimal(30))
 
     @staticmethod
-    def find_command_just_above_temp(temp: Decimal) -> Command:
-        # if temp >= 28:
-        #     return Commands.heat30
-        # if temp >= 26:
-        #     return Commands.heat28
-        # if temp >= 24:
-        #     return Commands.heat26
-        # if temp >= 22:
-        #     return Commands.heat24
-        if temp >= 20:
-            return Commands.heat22
-        if temp >= 18:
-            return Commands.heat20
-        if temp >= 16:
-            return Commands.heat18
-        if temp >= 10:
-            return Commands.heat16
-        if temp >= 8:
-            return Commands.heat10
-
-        return Commands.heat8
-
-    @staticmethod
-    def find_command_at_or_just_below_temp(temp: Decimal) -> Command:
-        if temp < 10:
-            return Commands.heat8
-        if temp < 16:
-            return Commands.heat10
-        if temp < 18:
-            return Commands.heat16
-        if temp < 20:
-            return Commands.heat18
-        if temp < 22:
-            return Commands.heat20
-        # if temp < 24:
-        #     return Commands.heat22
-        # if temp < 26:
-        #     return Commands.heat24
-        # if temp < 28:
-        #     return Commands.heat26
-        # if temp < 30:
-        #     return Commands.heat28
-        #
-        # return Commands.heat30
-
-        return Commands.heat22
-
-    @staticmethod
-    def command_from_controller(value: Decimal, target_inside_temp: Decimal) -> Command:
-
-        if value < target_inside_temp:
-            return Commands.off
+    def command_from_controller(value: Decimal) -> Command:
 
         # < 8 -> off
         # 8-10 -> 8
-        # 10-13 -> 10
-        # 13-16 -> 16
-        # 16-18 -> 18
-        # 18-20 -> 20
+        # 10-12 -> 10
+        # 12-14 -> 16
+        # 14-16 -> 18
+        # 16-18 -> 20
+        # >= 18  -> 22
 
-        if value < 13:
-            return Commands.find_command_at_or_just_below_temp(value)
-        else:
-            return Commands.find_command_just_above_temp(value)
+        if value < 8:
+            return Commands.off
+        if value < 10:
+            return Commands.heat8
+        if value < 12:
+            return Commands.heat10
+        if value < 14:
+            return Commands.heat16
+        if value < 16:
+            return Commands.heat18
+        if value < 18:
+            return Commands.heat20
+        if value < 20:
+            return Commands.heat22
+        if value < 22:
+            return Commands.heat26
+
+        return Commands.heat30
 
 
 db = orm.Database()

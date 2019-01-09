@@ -535,13 +535,13 @@ def get_next_command(valid_time: bool,
                      target_from_controller: Decimal):
 
     if inside_temp is not None:
-        next_command = Commands.command_from_controller(target_from_controller, target_inside_temp)
+        next_command = Commands.command_from_controller(target_from_controller)
     else:
         is_summer = valid_time and 5 <= arrow.now().month <= 9
 
         if valid_outside and outside_temp < target_inside_temp or not valid_outside and not is_summer:
             control_without_inside = temp_control_without_inside_temp(outside_temp, target_inside_temp)
-            next_command = Commands.command_from_controller(control_without_inside, target_inside_temp)
+            next_command = Commands.command_from_controller(control_without_inside)
         else:
             next_command = Commands.off
 
@@ -832,24 +832,22 @@ class Auto(State):
 
         error = get_error(target_inside_temp, inside_temp, hyst)
 
-        degrees_per_hour_slope = Decimal('0.2') / Decimal(3600)
+        degrees_per_hour_slope = Decimal('0.1') / Decimal(3600)
 
-        Auto.controller.set_i_low_limit(-degrees_per_hour_slope * Auto.controller.kd)
+        # Min and max value from Commands.command_from_controller()
+        lowest_heating_value = Decimal(8) - Decimal('0.01')
+        highest_heating_value = Decimal(18) + Decimal('0.01')
 
-        i_high_limits = [
-            Commands.heat22.temp + Decimal('0.01'),
-        ]
-        Auto.controller.set_i_high_limit(min(i_high_limits) - target_inside_temp)
+        Auto.controller.set_i_low_limit(lowest_heating_value - degrees_per_hour_slope * Auto.controller.kd)
+        Auto.controller.set_i_high_limit(highest_heating_value)
 
         controller_output, controller_log = Auto.controller.update(error)
 
-        target_from_controller = target_inside_temp + controller_output
-
-        add_extra_info('Controller: %s (%s)' % (decimal_round(target_from_controller, 2), controller_log))
+        add_extra_info('Controller: %s (%s)' % (decimal_round(controller_output, 2), controller_log))
 
         next_command = get_next_command(
             valid_time, inside_temp, outside_temp_ts.temp, valid_outside, target_inside_temp,
-            target_from_controller)
+            controller_output)
 
         Auto.handle_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp)
 
