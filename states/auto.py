@@ -474,7 +474,7 @@ def cooling_time_buffer_resolved(cooling_time_buffer, outside_temp, forecast: Un
 
 
 def hysteresis() -> Decimal:
-    return Decimal('0.2')
+    return Decimal('0.5')
 
 
 def get_forecast(add_extra_info, valid_time):
@@ -647,11 +647,11 @@ class Controller:
             return Decimal(0)
         return (n * sum_xy - sum_x * sum_y) / divider
 
-    def update(self, error: Optional[Decimal]) -> Tuple[Decimal, str]:
+    def update(self, error: Optional[Decimal], error_without_hysteresis: Optional[Decimal]) -> Tuple[Decimal, str]:
         if error is None:
             error = Decimal(0)
         else:
-            self._update_past_errors(error)
+            self._update_past_errors(error_without_hysteresis)
 
         logger.debug('controller error %.4f', error)
 
@@ -771,7 +771,7 @@ class Auto(State):
         if Auto.last_command is not None:
             logger.debug('Last auto command sent %d minutes ago', seconds_since_last_command / 60.0)
 
-        min_time_heating = 60 * 60 * 6
+        min_time_heating = 60 * 60 * 3
 
         if Auto.last_command is None or \
                 (next_command != Auto.last_command and (
@@ -831,6 +831,7 @@ class Auto(State):
         add_extra_info('Inside temperature: %s' % inside_temp)
 
         error = get_error(target_inside_temp, inside_temp, hyst)
+        error_without_hysteresis = get_error(target_inside_temp, inside_temp, Decimal(0))
 
         degrees_per_hour_slope = Decimal('0.1') / Decimal(3600)
 
@@ -841,7 +842,7 @@ class Auto(State):
         Auto.controller.set_i_low_limit(lowest_heating_value - degrees_per_hour_slope * Auto.controller.kd)
         Auto.controller.set_i_high_limit(highest_heating_value)
 
-        controller_output, controller_log = Auto.controller.update(error)
+        controller_output, controller_log = Auto.controller.update(error, error_without_hysteresis)
 
         add_extra_info('Controller: %s (%s)' % (decimal_round(controller_output, 2), controller_log))
 
