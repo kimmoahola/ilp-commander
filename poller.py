@@ -1,5 +1,4 @@
 # coding=utf-8
-import config
 from poller_helpers import logger, have_valid_time
 from states.read_last_message_from_db import ReadLastMessageFromDB
 
