@@ -446,8 +446,10 @@ def decimal_round(value, decimals=1) -> Optional[Decimal]:
 
 
 def have_valid_time(wait_time=30) -> bool:
+    logger.info('Waiting valid time')
 
     if 'windows' in platform.system().lower():
+        logger.info('Got valid time')
         return True
 
     sleep_time = 10
@@ -458,6 +460,8 @@ def have_valid_time(wait_time=30) -> bool:
             time.sleep(sleep_time)
 
         if os.system("(ntpq -pn | egrep '^\*') >/dev/null 2>&1") == 0:
+            logger.info('Got valid time')
             return True
 
+    logger.info('Did not get valid time')
     return False
