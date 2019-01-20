@@ -711,7 +711,7 @@ def estimate_temperature_with_rh(dew_point, rh):
 
 class Auto(State):
     last_command: Optional[Command] = None
-    last_command_send_time = time.time()
+    heating_start_time = time.time()
     minimum_inside_temp = config.MINIMUM_INSIDE_TEMP
     last_status_email_sent: Optional[str] = None
     controller = Controller(config.CONTROLLER_P, config.CONTROLLER_I, config.CONTROLLER_D)
@@ -766,22 +766,27 @@ class Auto(State):
 
         next_command, extra_info = self.process(minimum_inside_temp)
 
-        seconds_since_last_command = time.time() - Auto.last_command_send_time
+        seconds_since_heating_start = time.time() - Auto.heating_start_time
 
-        if Auto.last_command is not None:
-            logger.debug('Last auto command sent %d minutes ago', seconds_since_last_command / 60.0)
+        if Auto.last_command is not None and Auto.last_command != Commands.off:
+            logger.debug('Heating started %d hours ago', seconds_since_heating_start / 3600.0)
 
         min_time_heating = 60 * 60 * 3
 
         if Auto.last_command is None or \
                 (next_command != Auto.last_command and (
                     next_command != Commands.off or
-                    next_command == Commands.off and seconds_since_last_command > min_time_heating)):
+                    next_command == Commands.off and seconds_since_heating_start > min_time_heating)):
+
+            if (Auto.last_command is None or Auto.last_command == Commands.off) and next_command != Commands.off:
+                # From off to heating
+                Auto.heating_start_time = time.time()
+
             Auto.last_command = next_command
-            Auto.last_command_send_time = time.time()
             send_ir_signal(next_command, extra_info=extra_info)
 
         extra_info.append('Actual last command: %s' % Auto.last_command)
+        logger.info('Actual last command: %s' % Auto.last_command)
 
         write_log_to_sheet(next_command, extra_info=extra_info)
 
