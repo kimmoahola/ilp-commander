@@ -838,14 +838,14 @@ class Auto(State):
         error = get_error(target_inside_temp, inside_temp, hyst)
         error_without_hysteresis = get_error(target_inside_temp, inside_temp, Decimal(0))
 
-        degrees_per_hour_slope = Decimal('0.1') / Decimal(3600)
+        degrees_per_hour_slope = Decimal('0.05') / Decimal(3600)
 
         # Min and max value from Commands.command_from_controller()
         lowest_heating_value = Decimal(8) - Decimal('0.01')
         highest_heating_value = Decimal(18) + Decimal('0.01')
 
         Auto.controller.set_i_low_limit(lowest_heating_value - degrees_per_hour_slope * Auto.controller.kd)
-        Auto.controller.set_i_high_limit(highest_heating_value)
+        Auto.controller.set_i_high_limit(highest_heating_value + degrees_per_hour_slope * Auto.controller.kd)
 
         controller_output, controller_log = Auto.controller.update(error, error_without_hysteresis)
 
