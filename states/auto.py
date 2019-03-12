@@ -838,7 +838,7 @@ class Auto(State):
         error = get_error(target_inside_temp, inside_temp, hyst)
         error_without_hysteresis = get_error(target_inside_temp, inside_temp, Decimal(0))
 
-        degrees_per_hour_slope = Decimal('0.05') / Decimal(3600)
+        degrees_per_hour_slope = Decimal('0.1') / Decimal(3600)
 
         # Min and max value from Commands.command_from_controller()
         lowest_heating_value = Decimal(8) - Decimal('0.01')
