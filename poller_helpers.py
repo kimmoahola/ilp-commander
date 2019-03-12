@@ -81,10 +81,9 @@ class Commands:
         # 12-14 -> 16
         # 14-16 -> 18
         # 16-18 -> 20
-        # >= 18  -> 22
-        # 18-28  -> 22
-        # 28-32  -> 26
-        # >= 32  -> 30
+        # 18-24  -> 22
+        # 24-28  -> 26
+        # >= 28  -> 30
 
         if value < 8:
             return Commands.off
@@ -98,9 +97,9 @@ class Commands:
             return Commands.heat18
         if value < 18:
             return Commands.heat20
-        if value < 28:
+        if value < 24:
             return Commands.heat22
-        if value < 32:
+        if value < 28:
             return Commands.heat26
 
         return Commands.heat30
