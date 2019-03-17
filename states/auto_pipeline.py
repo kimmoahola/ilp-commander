@@ -57,6 +57,13 @@ class AutoPipeline(State):
         return get_most_recent_message(once=True)
 
     def nex(self, payload):
-        from states.wait_message_manual import WaitMessageManual
+        from states.manual import Manual
 
-        return WaitMessageManual
+        if payload:
+            if payload['command'] == 'auto':
+                return AutoPipeline
+            else:
+                AutoPipeline.persistent_data = {}
+                return Manual
+        else:
+            return AutoPipeline
