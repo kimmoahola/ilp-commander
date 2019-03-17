@@ -23,8 +23,8 @@ class ReadLastMessageFromDB(State):
 
     def nex(self, payload):
         if payload and payload['command'] == 'auto':
-            from states.auto import Auto
-            return Auto
+            from states.auto_pipeline import AutoPipeline
+            return AutoPipeline
         else:
             from states.manual import Manual
             return Manual
