@@ -407,6 +407,12 @@ def target_inside_temperature(add_extra_info,
         this_iteration_hours = min([Decimal(1), hours_to_forecast_start])
         outside_inside_diff = outside_after_forecast - iteration_inside_temp
         temp_drop = config.COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF * outside_inside_diff * this_iteration_hours
+
+        if outside_after_forecast <= -17:
+            # When outside temp is about -17 or colder, then the pump heating power will decrease a lot
+            logger.debug('Forecast temp <= -17: %.1f' % outside_after_forecast)
+            temp_drop *= 2
+
         iteration_inside_temp -= temp_drop
         iteration_ts = iteration_ts.shift(hours=float(-this_iteration_hours))
 
@@ -434,6 +440,11 @@ def target_inside_temperature(add_extra_info,
         #     iteration_inside_temp -= temp_drop
         # else:
         #     break
+
+        if fc.temp <= -17:
+            # When outside temp is about -17 or colder, then the pump heating power will decrease a lot
+            logger.debug('Forecast temp <= -17: %.1f' % fc.temp)
+            temp_drop *= 2
 
         iteration_inside_temp -= temp_drop
         iteration_ts = fc.ts
@@ -854,6 +865,14 @@ class Auto(State):
         next_command = get_next_command(
             valid_time, inside_temp, outside_temp_ts.temp, valid_outside, target_inside_temp,
             controller_output)
+
+        # Allow outside unit to do melting cycle to prevent the unit from freezing so much that the fan gets stuck
+        if valid_outside and Auto.last_command:
+            if outside_temp_ts.temp < 1:
+                temp_with_70_rh = estimate_temperature_with_rh(dew_point.temp, Decimal('0.7'))
+                if outside_temp_ts.temp < temp_with_70_rh and Auto.last_command != Commands.off:
+                    add_extra_info('Forcing heating')
+                    next_command = max([Commands.heat8, next_command])
 
         Auto.handle_status(add_extra_info, valid_time, forecast, valid_outside, inside_temp, target_inside_temp)
 
