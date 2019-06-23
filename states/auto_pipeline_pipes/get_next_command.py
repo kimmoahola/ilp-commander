@@ -19,6 +19,7 @@ def get_next_command(have_valid_time: bool,
                      valid_outside: bool,
                      target_inside_temp: Decimal,
                      error: Decimal,
+                     add_extra_info,
                      persistent_data,
                      **kwargs):
 
@@ -29,6 +30,7 @@ def get_next_command(have_valid_time: bool,
         inp = [float(target_inside_temp), float(error), float(error_slope),
                float(outside_temp_ts.temp if valid_outside else 0)]
         next_command = neural.predict(neural_network, inp)
+        add_extra_info('predicted {} -> {}'.format(inp, next_command))
     else:
         is_summer = have_valid_time and 5 <= arrow.now().month <= 9
 
