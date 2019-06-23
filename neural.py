@@ -294,7 +294,7 @@ def train(training_sets):
         logger.info('try {} hidden'.format(num_hidden))
 
         nn = NeuralNetwork(len(filtered_training_sets[0][0]), num_hidden, len(filtered_training_sets[0][1]))
-        for i in range(200000):
+        for i in range(100000):
             if i % 10000 == 9999:
                 this_error = nn.calculate_total_error(filtered_training_sets)
                 logger.info(str(this_error))
