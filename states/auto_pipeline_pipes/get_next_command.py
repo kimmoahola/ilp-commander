@@ -18,6 +18,7 @@ def get_next_command(have_valid_time: bool,
                      valid_outside: bool,
                      target_inside_temp: Decimal,
                      controller_output: Decimal,
+                     error: Optional[Decimal],
                      **kwargs):
 
     if inside_temp is not None:
@@ -30,5 +31,9 @@ def get_next_command(have_valid_time: bool,
             next_command = Commands.command_from_controller(control_without_inside)
         else:
             next_command = Commands.off
+
+    # Limit command to 22 unless error is high
+    if error is None or error is not None and error <= Decimal(1):
+        next_command = min(next_command, Commands.heat22)
 
     return {'next_command': next_command}
