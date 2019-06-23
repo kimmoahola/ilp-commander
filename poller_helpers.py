@@ -291,7 +291,8 @@ class InitPygsheets:
     def _get_work_sheet(cls):
         logger.info('Init pygsheets')
         gc = pygsheets.authorize(
-            outh_file=config.SHEET_OAUTH_FILE,
+            # outh_file=config.SHEET_OAUTH_FILE,
+            # outh_nonlocal=False,
             outh_nonlocal=True,
             no_cache=True)
         cls._sh = gc.open_by_key(config.SHEET_KEY)

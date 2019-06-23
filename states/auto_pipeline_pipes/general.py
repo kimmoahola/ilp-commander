@@ -7,6 +7,7 @@ from json import JSONDecodeError
 from pony import orm
 
 import config
+import neural
 from poller_helpers import Commands, send_ir_signal, write_log_to_sheet, SavedState, logger, decimal_round
 from states.controller import Controller
 
@@ -133,3 +134,12 @@ def save_controller_state(persistent_data, **kwargs):
             saved_state.set(json=data)
         else:
             SavedState(name='Auto.controller', json=data)
+
+
+def get_neural_network(persistent_data, **kwargs):
+    if 'neural_network' in persistent_data:
+        neural_network = persistent_data['neural_network']
+    else:
+        neural_network = neural.train(config.TRAINING_SETS)
+
+    return {}, {'neural_network': neural_network}

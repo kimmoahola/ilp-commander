@@ -19,6 +19,7 @@ class AutoPipeline(State):
     def run(self, payload):
 
         pipeline = [
+            general.get_neural_network,
             general.get_controller,
             general.handle_payload,
             lambda **kwargs: {'have_valid_time': have_valid_time()},

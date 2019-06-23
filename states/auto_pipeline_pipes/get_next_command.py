@@ -3,6 +3,7 @@ from typing import Optional
 
 import arrow
 
+import neural
 from poller_helpers import Commands, TempTs
 
 
@@ -17,11 +18,17 @@ def get_next_command(have_valid_time: bool,
                      outside_temp_ts: TempTs,
                      valid_outside: bool,
                      target_inside_temp: Decimal,
-                     controller_output: Decimal,
+                     error: Decimal,
+                     persistent_data,
                      **kwargs):
 
     if inside_temp is not None:
-        next_command = Commands.command_from_controller(controller_output)
+        neural_network = persistent_data.get('neural_network')
+
+        error_slope = 0
+        inp = [float(target_inside_temp), float(error), float(error_slope),
+               float(outside_temp_ts.temp if valid_outside else 0)]
+        next_command = neural.predict(neural_network, inp)
     else:
         is_summer = have_valid_time and 5 <= arrow.now().month <= 9
 
