@@ -24,7 +24,7 @@ random.seed(seed)
 
 
 class NeuralNetwork:
-    LEARNING_RATE = 0.5
+    LEARNING_RATE = 0.2
 
     def __init__(self, num_inputs, num_hidden, num_outputs, hidden_layer_weights=None, hidden_layer_bias=None,
                  output_layer_weights=None, output_layer_bias=None):
@@ -126,7 +126,7 @@ class NeuralNetwork:
             # Δw = α * ∂Eⱼ/∂wᵢ
             self.output_layer.neurons[o].bias -= self.LEARNING_RATE * pd_error_wrt_weight
 
-            # 6. Update hidden neuron weights
+        # 6. Update hidden neuron weights
         for h in range(len(self.hidden_layer.neurons)):
             # ∂Eⱼ/∂wᵢ = ∂E/∂zⱼ * ∂zⱼ/∂wᵢ
             pd_error_wrt_weight = pd_errors_wrt_hidden_neuron_total_net_input[h] * \
@@ -261,7 +261,7 @@ class Neuron:
 
 
 def filter_training_sets(training_sets):
-    same_tolerances = [1, 0.2, 0.2, 3]
+    same_tolerances = [1, 0.2, 3]
 
     new_training_sets = []
 
@@ -285,7 +285,7 @@ def train(training_sets):
 
     filtered_training_sets = filter_training_sets(training_sets)
 
-    hidden_networks_to_try = range(8, 21, 3)
+    hidden_networks_to_try = range(8, 24, 3)
 
     nn = None
 
@@ -294,12 +294,13 @@ def train(training_sets):
         logger.info('try {} hidden'.format(num_hidden))
 
         nn = NeuralNetwork(len(filtered_training_sets[0][0]), num_hidden, len(filtered_training_sets[0][1]))
-        for i in range(100000):
+        for i in range(200000):
             if i % 10000 == 9999:
                 this_error = nn.calculate_total_error(filtered_training_sets)
                 logger.info(str(this_error))
-                if this_error < 0.01:
+                if this_error <= 0.05:
                     logger.info('training iterations {}'.format(i))
+                    nn.inspect()
                     return nn
             training_inputs, training_outputs = random.choice(filtered_training_sets)
             nn.train(training_inputs, training_outputs)
@@ -311,7 +312,8 @@ def train(training_sets):
 
 
 def predict(nn, inp):
-    output_groups = [Commands.off, Commands.heat8, Commands.heat10, Commands.heat16, Commands.heat22]
+    # output_groups = [Commands.off, Commands.heat8, Commands.heat10, Commands.heat16, Commands.heat22]
+    output_groups = [Commands.off, Commands.heat10, Commands.heat22]
     predicted = nn.predict(inp)
     predicted_mode = output_groups[predicted.index(max(predicted))]
     logger.info('predicted {} -> {} ({})'.format(inp, predicted_mode, max(predicted)))

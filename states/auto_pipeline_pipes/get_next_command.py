@@ -26,9 +26,7 @@ def get_next_command(have_valid_time: bool,
     if inside_temp is not None:
         neural_network = persistent_data.get('neural_network')
 
-        error_slope = 0
-        inp = [float(target_inside_temp), float(error), float(error_slope),
-               float(outside_temp_ts.temp if valid_outside else 0)]
+        inp = [float(target_inside_temp), float(error), float(outside_temp_ts.temp if valid_outside else 0)]
         next_command = neural.predict(neural_network, inp)
         add_extra_info('predicted {} -> {}'.format(inp, next_command))
     else:
