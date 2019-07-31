@@ -109,9 +109,8 @@ def update_controller(add_extra_info, error, error_without_hysteresis, persisten
     controller = persistent_data.get('controller')
     degrees_per_hour_slope = Decimal('0.15') / Decimal(3600)
 
-    # Min and max value from Commands.command_from_controller()
-    lowest_heating_value = Decimal(8) - Decimal('0.01')
-    highest_heating_value = Decimal(18) + Decimal('0.01')
+    lowest_heating_value = Decimal(0) - Decimal('0.01')
+    highest_heating_value = Decimal(10) + Decimal('0.01')
 
     controller.set_i_low_limit(lowest_heating_value - degrees_per_hour_slope * controller.kd)
     controller.set_i_high_limit(highest_heating_value + degrees_per_hour_slope * controller.kd)

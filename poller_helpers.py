@@ -75,28 +75,10 @@ class Commands:
     @staticmethod
     def command_from_controller(value: Decimal) -> Command:
 
-        # < 8 -> off
-        # 8-10 -> 8
-        # 10-12 -> 10
-        # 12-14 -> 16
-        # 14-16 -> 18
-        # 16-18 -> 20
-        # >= 18  -> 22
-
-        if value < 8:
+        if value <= 0:
             return Commands.off
-        if value < 10:
-            return Commands.heat8
-        if value < 12:
-            return Commands.heat10
-        if value < 14:
-            return Commands.heat16
-        if value < 16:
-            return Commands.heat18
-        if value < 18:
-            return Commands.heat20
 
-        return Commands.heat22
+        return Commands.heat24
 
 
 db = orm.Database()
