@@ -86,7 +86,7 @@ class Controller:
             logger.debug('controller delta_time %.4f', delta_time)
 
             if error > 0 and error_slope_per_hour >= Decimal('-0.05') or error < 0 and error_slope_per_hour <= 0:
-                integral_update_value = self.ki * error * delta_time
+                integral_update_value = self.ki * error * delta_time / Decimal(3600)
                 logger.info('Updating integral with %.4f', integral_update_value)
                 self.integral += integral_update_value
             else:
@@ -102,7 +102,7 @@ class Controller:
 
         i_term = self.integral
 
-        d_term = self.kd * error_slope_per_second
+        d_term = self.kd * error_slope_per_hour
 
         logger.debug('controller p_term %.4f', p_term)
         logger.debug('controller i_term %.4f', i_term)
