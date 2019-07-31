@@ -73,12 +73,48 @@ class Commands:
     heat30 = Command('heat_30__fan_high__swing_down', Decimal(30))
 
     @staticmethod
-    def command_from_controller(value: Decimal) -> Command:
+    def command_from_controller(value: Decimal, inside_temp: Optional[Decimal]) -> Command:
 
-        if value <= 0:
-            return Commands.off
+        list_of_commands = [
+            Commands.heat8,
+            Commands.heat10,
+            Commands.heat16,
+            Commands.heat22,
+        ]
 
-        return Commands.heat24
+        if inside_temp is None:
+            heating_commands = list_of_commands
+        else:
+            heating_commands = list(filter(lambda c: c.temp > inside_temp + 2, list_of_commands))
+
+        ranges = [
+            [0, Commands.off],
+        ]
+
+        command_range = 1 / (len(heating_commands) + 1)
+
+        for heating_command in heating_commands:
+            ranges.append([ranges[-1][0] + command_range, heating_command])
+
+        ranges.append([1.0, Commands.heat22])
+
+        logger.info('Ranges %s' % ranges)
+
+        # ranges = [
+        #     [0, Commands.off],
+        #     [0.1, Commands.heat8],
+        #     [0.2, Commands.heat10],
+        #     [0.4, Commands.heat16],
+        #     [0.6, Commands.heat18],
+        #     [0.8, Commands.heat20],
+        #     [1.0, Commands.heat22],
+        # ]
+
+        for r in ranges:
+            if value < r[0]:
+                return r[1]
+
+        return ranges[-1][1]
 
 
 db = orm.Database()

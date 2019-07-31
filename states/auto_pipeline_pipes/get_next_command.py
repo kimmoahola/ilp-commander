@@ -22,7 +22,7 @@ def get_next_command(have_valid_time: bool,
                      **kwargs):
 
     if inside_temp is not None:
-        next_command = Commands.command_from_controller(controller_output)
+        next_command = Commands.command_from_controller(controller_output, inside_temp)
     else:
         is_summer = have_valid_time and 5 <= arrow.now().month <= 9
 
