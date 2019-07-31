@@ -79,7 +79,6 @@ class Commands:
             Commands.heat8,
             Commands.heat10,
             Commands.heat16,
-            Commands.heat22,
         ]
 
         if inside_temp is None:
@@ -111,7 +110,7 @@ class Commands:
         # ]
 
         for r in ranges:
-            if value < r[0]:
+            if value <= r[0]:
                 return r[1]
 
         return ranges[-1][1]
