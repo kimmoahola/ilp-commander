@@ -53,9 +53,6 @@ class Controller:
         ]
 
     def _past_error_slope_per_second(self) -> Decimal:
-        min_time = Decimal(60 * 30)  # 30 min
-        if self.past_errors and self.past_errors[-1][0] - self.past_errors[0][0] < min_time:
-            return Decimal(0)
         n = Decimal(len(self.past_errors))
         sum_xy = Decimal(sum(p[0] * p[1] for p in self.past_errors))
         sum_x = Decimal(sum(p[0] for p in self.past_errors))
