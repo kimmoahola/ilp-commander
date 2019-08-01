@@ -73,18 +73,21 @@ class Commands:
     heat30 = Command('heat_30__fan_high__swing_down', Decimal(30))
 
     @staticmethod
-    def command_from_controller(value: Decimal, inside_temp: Optional[Decimal]) -> Command:
+    def command_from_controller(
+            value: Decimal, inside_temp: Optional[Decimal], outside_temp: Optional[Decimal]) -> Command:
 
         list_of_commands = [
             Commands.heat8,
             Commands.heat10,
             Commands.heat16,
+            Commands.heat18,
+            Commands.heat20,
         ]
 
         if inside_temp is None:
             heating_commands = list_of_commands
         else:
-            heating_commands = list(filter(lambda c: c.temp > inside_temp + 2, list_of_commands))
+            heating_commands = list(filter(lambda c: c.temp > inside_temp, list_of_commands))
 
         ranges = [
             [0, Commands.off],
@@ -95,19 +98,12 @@ class Commands:
         for heating_command in heating_commands:
             ranges.append([ranges[-1][0] + command_range, heating_command])
 
-        ranges.append([1.0, Commands.heat22])
+        if outside_temp is None or outside_temp > 10:
+            ranges.append([1.0, Commands.heat22])
+        else:
+            ranges.append([1.0, Commands.heat24])
 
         logger.info('Ranges %s' % ranges)
-
-        # ranges = [
-        #     [0, Commands.off],
-        #     [0.1, Commands.heat8],
-        #     [0.2, Commands.heat10],
-        #     [0.4, Commands.heat16],
-        #     [0.6, Commands.heat18],
-        #     [0.8, Commands.heat20],
-        #     [1.0, Commands.heat22],
-        # ]
 
         for r in ranges:
             if value <= r[0]:
