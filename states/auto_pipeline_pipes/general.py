@@ -100,7 +100,7 @@ def get_add_extra_info(**kwargs):
 
 
 def hysteresis(add_extra_info, target_inside_temp, **kwargs):
-    hyst = Decimal('0.5')
+    hyst = Decimal('0.0')
     add_extra_info('Hysteresis: %s (%s)' % (decimal_round(hyst), decimal_round(target_inside_temp + hyst)))
     return {'hysteresis': hyst}
 
