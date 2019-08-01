@@ -98,7 +98,7 @@ class Commands:
         for heating_command in heating_commands:
             ranges.append([ranges[-1][0] + command_range, heating_command])
 
-        if outside_temp is None or outside_temp > 10:
+        if outside_temp is None or outside_temp > 15:
             ranges.append([1.0, Commands.heat22])
         else:
             ranges.append([1.0, Commands.heat24])
