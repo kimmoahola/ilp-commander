@@ -107,7 +107,7 @@ def hysteresis(add_extra_info, target_inside_temp, **kwargs):
 
 def update_controller(add_extra_info, error, error_without_hysteresis, persistent_data, **kwargs):
     controller = persistent_data.get('controller')
-    degrees_per_hour_slope = Decimal('0.15') / Decimal(3600)
+    degrees_per_hour_slope = Decimal('0.05')
 
     lowest_heating_value = Decimal(0) - Decimal('0.01')
     highest_heating_value = Decimal(1) + Decimal('0.01')
