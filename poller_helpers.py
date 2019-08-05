@@ -82,34 +82,38 @@ class Commands:
             Commands.heat16,
             Commands.heat18,
             Commands.heat20,
+            Commands.heat22,
         ]
+
+        if outside_temp is not None and outside_temp < 15:
+            list_of_commands.append(Commands.heat24)
 
         if inside_temp is None:
             heating_commands = list_of_commands
         else:
-            heating_commands = list(filter(lambda c: c.temp > inside_temp, list_of_commands))
+            heating_commands = list(filter(lambda c: c.temp > inside_temp + 2, list_of_commands))
 
-        ranges = [
-            [0, Commands.off],
-        ]
+        ranges = []
 
-        command_range = 1 / (len(heating_commands) + 1)
+        if len(heating_commands) >= 2:
 
-        for heating_command in heating_commands:
-            ranges.append([ranges[-1][0] + command_range, heating_command])
+            command_range = 1 / (len(heating_commands) - 1)
 
-        if outside_temp is None or outside_temp > 15:
-            ranges.append([1.0, Commands.heat22])
-        else:
-            ranges.append([1.0, Commands.heat24])
+            ranges.append([0, heating_commands[0]])
+
+            for heating_command in heating_commands[1:]:
+                ranges.append([ranges[-1][0] + command_range, heating_command])
 
         logger.info('Ranges %s' % ranges)
 
+        if value <= 0:
+            return Commands.off
+
         for r in ranges:
-            if value <= r[0]:
+            if value >= r[0]:
                 return r[1]
 
-        return ranges[-1][1]
+        return list_of_commands[-1]
 
 
 db = orm.Database()
