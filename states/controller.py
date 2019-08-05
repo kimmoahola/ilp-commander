@@ -78,6 +78,9 @@ class Controller:
         error_slope_per_second = self._past_error_slope_per_second()
         error_slope_per_hour = error_slope_per_second * Decimal(3600)
 
+        error_slope_per_hour = min(error_slope_per_hour, Decimal('0.5'))
+        error_slope_per_hour = max(error_slope_per_hour, Decimal('-0.5'))
+
         if self.current_time is not None:
             delta_time = Decimal(new_time - self.current_time)
             logger.debug('controller delta_time %.4f', delta_time)
