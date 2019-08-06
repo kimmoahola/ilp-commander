@@ -22,7 +22,7 @@ def send_command(persistent_data, next_command, extra_info, **kwargs):
     if last_command is not None and last_command != Commands.off:
         logger.debug('Heating started %d hours ago', seconds_since_heating_start / 3600.0)
 
-    min_time_heating = 60 * 60 * 3
+    min_time_heating = 60 * 30
 
     if last_command is None or \
             (next_command != last_command and (
@@ -32,9 +32,17 @@ def send_command(persistent_data, next_command, extra_info, **kwargs):
         if (last_command is None or last_command == Commands.off) and next_command != Commands.off:
             # From off to heating
             heating_start_time = now
+            send_command_email = True
+
+        elif (last_command is None or last_command != Commands.off) and next_command == Commands.off:
+            # From heating to off
+            send_command_email = True
+
+        else:
+            send_command_email = False
 
         last_command = next_command
-        send_ir_signal(next_command, extra_info=extra_info)
+        send_ir_signal(next_command, extra_info=extra_info, send_command_email=send_command_email)
 
     extra_info.append('Actual last command: %s' % last_command)
     logger.info('Actual last command: %s' % last_command)

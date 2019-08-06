@@ -185,7 +185,7 @@ def email(subject, message):
             logger.exception(e)
 
 
-def send_ir_signal(command: Command, extra_info: Optional[list] = None):
+def send_ir_signal(command: Command, extra_info: Optional[list] = None, send_command_email: bool = True):
     if extra_info is None:
         extra_info = []
 
@@ -199,7 +199,8 @@ def send_ir_signal(command: Command, extra_info: Optional[list] = None):
         logger.exception(e)
         message += '\nirsend: %s' % type(e).__name__
 
-    email('Send IR', message)
+    if send_command_email:
+        email('Send IR', message)
 
 
 def time_str(from_str=None):
