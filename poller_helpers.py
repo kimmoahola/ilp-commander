@@ -321,6 +321,25 @@ def get_url(url):
     return requests.get(url, timeout=60)
 
 
+def get_from_lambda_url(url):
+    temp, ts = None, None
+
+    try:
+        result = get_url(url)
+    except Exception as e:
+        logger.exception(e)
+    else:
+        if result.status_code != 200:
+            logger.error('%d: %s' % (result.status_code, result.content))
+        else:
+            latest_item = result.json().get('latestItem')
+            temp = Decimal(latest_item.get('temperature'))
+            ts = arrow.get(latest_item.get('ts'))
+
+    logger.info('temp:%s ts:%s', temp, ts)
+    return temp, ts
+
+
 @timing
 def get_message_from_sheet() -> str:
     sh = InitPygsheets.init_pygsheets()

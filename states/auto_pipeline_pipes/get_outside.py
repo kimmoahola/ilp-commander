@@ -5,44 +5,16 @@ import arrow
 import xmltodict
 
 import config
-from poller_helpers import TempTs, decimal_round, get_url, timing, logger
+from poller_helpers import TempTs, decimal_round, get_url, timing, logger, get_from_lambda_url
 from states.auto_pipeline_pipes.helpers import get_temp, caching
 
 
 PREDEFINED_OUTSIDE_TEMP = Decimal(-10)
 
 
-def get_temp_from_temp_api(host_and_port, table_name) -> Tuple[Optional[Decimal], Optional[str]]:
-    temp, ts = None, None
-
-    try:
-        result = get_url('http://{host_and_port}/latest?table={table_name}'.format(
-            host_and_port=host_and_port, table_name=table_name))
-    except Exception as e:
-        logger.exception(e)
-    else:
-        if result.status_code != 200:
-            logger.error('%d: %s' % (result.status_code, result.content))
-        else:
-            result_json = result.json()
-            if 'ts' in result_json and 'temperature' in result_json:
-                ts = result_json['ts']
-                temp = Decimal(result_json['temperature'])
-
-    return temp, ts
-
-
 @timing
-@caching(cache_name='ulkoilma')
 def receive_ulkoilma_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]:
-    temp, ts = get_temp_from_temp_api(
-        config.TEMP_API_OUTSIDE.get('host_and_port'), config.TEMP_API_OUTSIDE.get('table_name'))
-
-    if ts is not None:
-        ts = arrow.get(ts).to(config.TIMEZONE)
-
-    logger.info('temp:%s ts:%s', temp, ts)
-    return temp, ts
+    return get_from_lambda_url(config.OUTSIDE_TEMP_ENDPOINT)
 
 
 @timing

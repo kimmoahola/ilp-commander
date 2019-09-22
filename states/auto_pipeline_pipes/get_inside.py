@@ -2,23 +2,15 @@ from decimal import Decimal
 from typing import Optional, Tuple
 
 import arrow
-from dateutil import tz
 
 import config
-from poller_helpers import timing, get_temp_from_sheet, logger
-from states.auto_pipeline_pipes.helpers import get_temp, caching
+from poller_helpers import timing, get_from_lambda_url
+from states.auto_pipeline_pipes.helpers import get_temp
 
 
 @timing
-@caching(cache_name='inside')
 def receive_inside_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]:
-    temp, ts = get_temp_from_sheet(sheet_title=config.INSIDE_SHEET_TITLE)
-
-    if ts is not None:
-        ts = arrow.get(ts, 'DD.MM.YYYY klo HH:mm').replace(tzinfo=tz.gettz(config.TIMEZONE))
-
-    logger.info('temp:%s ts:%s', temp, ts)
-    return temp, ts
+    return get_from_lambda_url(config.INSIDE_TEMP_ENDPOINT)
 
 
 def get_inside(add_extra_info, **kwargs):
@@ -26,4 +18,3 @@ def get_inside(add_extra_info, **kwargs):
     add_extra_info('Inside temperature: %s' % inside_temp)
 
     return {'inside_temp': inside_temp}
-
