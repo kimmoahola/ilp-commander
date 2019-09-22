@@ -42,7 +42,7 @@ class Controller:
     def _update_past_errors(self, error: Decimal):
         self.past_errors.append((Decimal(time.time()), error))
 
-        hours = Decimal(3600) * Decimal(3)
+        hours = Decimal(3600) * Decimal(2)
         past_error_time_limit = Decimal(time.time()) - hours
 
         self.past_errors = [
