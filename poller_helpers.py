@@ -109,7 +109,7 @@ class Commands:
         if value <= 0:
             return Commands.off
 
-        for r in ranges:
+        for r in reversed(ranges):
             if value >= r[0]:
                 return r[1]
 
