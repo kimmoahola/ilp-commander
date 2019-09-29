@@ -34,6 +34,7 @@ class AutoPipeline(State):
             get_next_command,
             send_status_mail,
             general.send_command,
+            general.send_to_lambda,
             general.write_log,
             general.save_controller_state,
         ]

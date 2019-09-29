@@ -14,6 +14,7 @@ OPEN_WEATHER_MAP_LOCATION = ''
 YR_NO_LOCATION = 'Finland/Western_Finland/Tampere'
 INSIDE_TEMP_ENDPOINT = "https://1234.execute-api.eu-north-1.amazonaws.com/..."
 OUTSIDE_TEMP_ENDPOINT = "https://1234.execute-api.eu-north-1.amazonaws.com/..."
+STORAGE_ROOT_URL = "https://1234.execute-api.eu-north-1.amazonaws.com/..."
 EMAIL_ADDRESSES = []
 HEALTHCHECK_URL_CRON = ''
 HEALTHCHECK_URL_MESSAGE = ''

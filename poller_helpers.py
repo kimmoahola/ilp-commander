@@ -1,4 +1,6 @@
 # coding=utf-8
+import datetime
+import itertools
 import json
 import logging
 import os
@@ -12,8 +14,8 @@ from subprocess import Popen, PIPE
 from typing import NamedTuple, List, Optional, Tuple
 
 import arrow
-import itertools
 import pygsheets
+import pytz
 import requests
 from pony import orm
 from retry import retry
@@ -212,6 +214,10 @@ def time_str(from_str=None):
     return a.to(config.TIMEZONE).format('DD.MM.YYYY HH:mm')
 
 
+def get_now_isoformat():
+    return datetime.datetime.utcnow().replace(tzinfo=pytz.utc, microsecond=0).isoformat()
+
+
 @retry(tries=2, delay=5)
 def actually_send_ir_signal(command: Command):
     try:
@@ -319,6 +325,20 @@ class InitPygsheets:
 def get_url(url):
     logger.debug(url)
     return requests.get(url, timeout=60)
+
+
+@retry(tries=3, delay=10)
+def post_url(url, data):
+    logger.debug(url)
+
+    def decimal_default(obj):
+        if isinstance(obj, Decimal):
+            return str(obj)
+        raise TypeError
+
+    dumps = json.dumps(data, default=decimal_default)
+    logger.debug(dumps)
+    return requests.post(url, data=dumps, timeout=60)
 
 
 def get_from_lambda_url(url):

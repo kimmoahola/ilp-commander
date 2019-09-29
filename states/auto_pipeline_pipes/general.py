@@ -3,11 +3,13 @@ import json
 import time
 from decimal import Decimal
 from json import JSONDecodeError
+from typing import Optional
 
 from pony import orm
 
 import config
-from poller_helpers import Commands, send_ir_signal, write_log_to_sheet, SavedState, logger, decimal_round
+from poller_helpers import Commands, send_ir_signal, write_log_to_sheet, SavedState, logger, decimal_round, Command, \
+    get_now_isoformat, TempTs, post_url
 from states.controller import Controller
 
 
@@ -140,3 +142,25 @@ def save_controller_state(persistent_data, **kwargs):
             saved_state.set(json=data)
         else:
             SavedState(name='Auto.controller', json=data)
+
+
+def send_to_lambda(target_inside_temp: Decimal, inside_temp: Optional[Decimal], outside_temp_ts: TempTs,
+                   next_command: Command, **kwargs):
+    data = {
+        'sensorId': {'S': 'controller'},
+        'ts': {'S': get_now_isoformat()},
+        'temperatures': {
+            'M': {
+                'target_inside': {'S': decimal_round(target_inside_temp, decimals=2)},
+                'outside': {'S': outside_temp_ts.temp},
+            },
+        },
+    }
+
+    if inside_temp is not None:
+        data['temperatures']['M']['inside'] = {'S': inside_temp}
+
+    if next_command.temp is not None:
+        data['temperatures']['M']['command'] = {'S': next_command.temp}
+
+    post_url(url=config.STORAGE_ROOT_URL + 'addOne', data=data)
