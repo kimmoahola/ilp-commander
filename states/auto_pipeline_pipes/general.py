@@ -3,7 +3,7 @@ import json
 import time
 from decimal import Decimal
 from json import JSONDecodeError
-from typing import Optional
+from typing import Optional, Dict
 
 from pony import orm
 
@@ -145,7 +145,7 @@ def save_controller_state(persistent_data, **kwargs):
 
 
 def send_to_lambda(target_inside_temp: Decimal, inside_temp: Optional[Decimal], outside_temp_ts: TempTs,
-                   last_command: Command, **kwargs):
+                   persistent_data: Dict, **kwargs):
     data = {
         'sensorId': {'S': 'controller'},
         'ts': {'S': get_now_isoformat()},
@@ -160,7 +160,9 @@ def send_to_lambda(target_inside_temp: Decimal, inside_temp: Optional[Decimal], 
     if inside_temp is not None:
         data['temperatures']['M']['inside'] = {'S': inside_temp}
 
-    if last_command.temp is not None:
+    last_command = persistent_data.get('last_command')
+
+    if last_command is not None and last_command.temp is not None:
         data['temperatures']['M']['command'] = {'S': last_command.temp}
 
     post_url(url=config.STORAGE_ROOT_URL + 'addOne', data=data)
