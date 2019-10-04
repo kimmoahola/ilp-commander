@@ -1,4 +1,6 @@
 # coding=utf-8
+import datetime
+import itertools
 import json
 import logging
 import os
@@ -12,8 +14,8 @@ from subprocess import Popen, PIPE
 from typing import NamedTuple, List, Optional, Tuple
 
 import arrow
-import itertools
 import pygsheets
+import pytz
 import requests
 from pony import orm
 from retry import retry
@@ -73,36 +75,44 @@ class Commands:
     heat30 = Command('heat_30__fan_high__swing_down', Decimal(30))
 
     @staticmethod
-    def command_from_controller(value: Decimal) -> Command:
+    def command_from_controller(
+            value: Decimal, inside_temp: Decimal, outside_temp: Optional[Decimal]) -> Command:
 
-        # < 8 -> off
-        # 8-10 -> 8
-        # 10-12 -> 10
-        # 12-14 -> 16
-        # 14-16 -> 18
-        # 16-18 -> 20
-        # 18-24  -> 22
-        # 24-28  -> 26
-        # >= 28  -> 30
+        list_of_commands = [
+            Commands.heat8,
+            Commands.heat10,
+            Commands.heat16,
+            Commands.heat18,
+            Commands.heat20,
+            Commands.heat22,
+        ]
 
-        if value < 8:
+        if outside_temp is not None and outside_temp < 15:
+            list_of_commands.append(Commands.heat24)
+
+        heating_commands = list(filter(lambda c: c.temp > inside_temp + 2, list_of_commands))
+
+        ranges = []
+
+        if len(heating_commands) >= 2:
+
+            command_range = 1 / (len(heating_commands) - 1)
+
+            ranges.append([0, heating_commands[0]])
+
+            for heating_command in heating_commands[1:]:
+                ranges.append([ranges[-1][0] + command_range, heating_command])
+
+        logger.info('Ranges %s' % ranges)
+
+        if value <= 0:
             return Commands.off
-        if value < 10:
-            return Commands.heat8
-        if value < 12:
-            return Commands.heat10
-        if value < 14:
-            return Commands.heat16
-        if value < 16:
-            return Commands.heat18
-        if value < 18:
-            return Commands.heat20
-        if value < 24:
-            return Commands.heat22
-        if value < 28:
-            return Commands.heat26
 
-        return Commands.heat30
+        for r in reversed(ranges):
+            if value >= r[0]:
+                return r[1]
+
+        return list_of_commands[-1]
 
 
 db = orm.Database()
@@ -174,7 +184,7 @@ def email(subject, message):
             logger.exception(e)
 
 
-def send_ir_signal(command: Command, extra_info: Optional[list] = None):
+def send_ir_signal(command: Command, extra_info: Optional[list] = None, send_command_email: bool = True):
     if extra_info is None:
         extra_info = []
 
@@ -188,7 +198,8 @@ def send_ir_signal(command: Command, extra_info: Optional[list] = None):
         logger.exception(e)
         message += '\nirsend: %s' % type(e).__name__
 
-    email('Send IR', message)
+    if send_command_email:
+        email('Send IR', message)
 
 
 def time_str(from_str=None):
@@ -198,6 +209,10 @@ def time_str(from_str=None):
         a = arrow.utcnow()
 
     return a.to(config.TIMEZONE).format('DD.MM.YYYY HH:mm')
+
+
+def get_now_isoformat():
+    return datetime.datetime.utcnow().replace(tzinfo=pytz.utc, microsecond=0).isoformat()
 
 
 @retry(tries=2, delay=5)
@@ -307,6 +322,39 @@ class InitPygsheets:
 def get_url(url):
     logger.debug(url)
     return requests.get(url, timeout=60)
+
+
+@retry(tries=3, delay=10)
+def post_url(url, data):
+    logger.debug(url)
+
+    def decimal_default(obj):
+        if isinstance(obj, Decimal):
+            return str(obj)
+        raise TypeError
+
+    dumps = json.dumps(data, default=decimal_default)
+    logger.debug(dumps)
+    return requests.post(url, data=dumps, timeout=60)
+
+
+def get_from_lambda_url(url):
+    temp, ts = None, None
+
+    try:
+        result = get_url(url)
+    except Exception as e:
+        logger.exception(e)
+    else:
+        if result.status_code != 200:
+            logger.error('%d: %s' % (result.status_code, result.content))
+        else:
+            latest_item = result.json().get('latestItem')
+            temp = Decimal(latest_item.get('temperature'))
+            ts = arrow.get(latest_item.get('ts'))
+
+    logger.info('temp:%s ts:%s', temp, ts)
+    return temp, ts
 
 
 @timing

@@ -7,10 +7,10 @@ class WaitMessageManual(State):
         return get_most_recent_message()
 
     def nex(self, payload):
-        from states.auto import Auto
+        from states.auto_pipeline import AutoPipeline
         from states.manual import Manual
 
         if payload['command'] == 'auto':
-            return Auto
+            return AutoPipeline
         else:
             return Manual

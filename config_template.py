@@ -12,18 +12,13 @@ FMI_LOCATION = 'tampere'
 OPEN_WEATHER_MAP_KEY = ''
 OPEN_WEATHER_MAP_LOCATION = ''
 YR_NO_LOCATION = 'Finland/Western_Finland/Tampere'
+INSIDE_TEMP_ENDPOINT = "https://1234.execute-api.eu-north-1.amazonaws.com/..."
+OUTSIDE_TEMP_ENDPOINT = "https://1234.execute-api.eu-north-1.amazonaws.com/..."
+STORAGE_ROOT_URL = "https://1234.execute-api.eu-north-1.amazonaws.com/..."
 EMAIL_ADDRESSES = []
 HEALTHCHECK_URL_CRON = ''
 HEALTHCHECK_URL_MESSAGE = ''
 CACHE_TIMES = {
-    'ulkoilma': {
-        'if_ok': 25,
-        'if_failed': 120,
-    },
-    'inside': {
-        'if_ok': 15,
-        'if_failed': 120,
-    },
     'fmi': {
         'if_ok': 15,
         'if_failed': 120,
@@ -46,8 +41,8 @@ MINIMUM_INSIDE_TEMP = Decimal('3.5')
 COOLING_RATE_PER_HOUR_PER_TEMPERATURE_DIFF = Decimal('0.015')
 
 CONTROLLER_P = Decimal(2)
-CONTROLLER_I = Decimal(2) / Decimal(3600)
-CONTROLLER_D = Decimal(3600) * Decimal(25)
+CONTROLLER_I = Decimal(2)
+CONTROLLER_D = Decimal(25)
 
 
 def cooling_time_buffer_func(outside_temp):
@@ -58,7 +53,3 @@ def cooling_time_buffer_func(outside_temp):
 
 
 COOLING_TIME_BUFFER = cooling_time_buffer_func  # hours
-TEMP_API_OUTSIDE = {
-    'host_and_port': '192.168.1.36:8080',
-    'table_name': 'ulkoilma',
-}
