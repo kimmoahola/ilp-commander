@@ -76,7 +76,7 @@ class Commands:
 
     @staticmethod
     def command_from_controller(
-            value: Decimal, inside_temp: Optional[Decimal], outside_temp: Optional[Decimal]) -> Command:
+            value: Decimal, inside_temp: Decimal, outside_temp: Optional[Decimal]) -> Command:
 
         list_of_commands = [
             Commands.heat8,
@@ -90,10 +90,7 @@ class Commands:
         if outside_temp is not None and outside_temp < 15:
             list_of_commands.append(Commands.heat24)
 
-        if inside_temp is None:
-            heating_commands = list_of_commands
-        else:
-            heating_commands = list(filter(lambda c: c.temp > inside_temp + 2, list_of_commands))
+        heating_commands = list(filter(lambda c: c.temp > inside_temp + 2, list_of_commands))
 
         ranges = []
 
