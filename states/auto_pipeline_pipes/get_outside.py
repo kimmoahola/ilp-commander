@@ -25,9 +25,9 @@ def receive_fmi_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]
     try:
         starttime = arrow.now().shift(hours=-1).to('UTC').format('YYYY-MM-DDTHH:mm:ss') + 'Z'
         result = get_url(
-            'http://data.fmi.fi/fmi-apikey/{key}/wfs?request=getFeature&storedquery_id=fmi::observations::weather'
+            'https://opendata.fmi.fi/wfs?request=getFeature&storedquery_id=fmi::observations::weather'
             '::simple&place={place}&parameters=temperature&starttime={starttime}'.format(
-                key=config.FMI_KEY, place=config.FMI_LOCATION, starttime=starttime))
+                place=config.FMI_LOCATION, starttime=starttime))
     except Exception as e:
         logger.exception(e)
     else:

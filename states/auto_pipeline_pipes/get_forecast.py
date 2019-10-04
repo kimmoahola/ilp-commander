@@ -61,13 +61,11 @@ def receive_fmi_forecast() -> Tuple[Optional[List[TempTs]], Optional[arrow.Arrow
 
     try:
         endtime = arrow.now().shift(hours=63).to('UTC').format('YYYY-MM-DDTHH:mm:ss') + 'Z'
-        url = 'http://data.fmi.fi/fmi-apikey/{key}/wfs?request=getFeature&' \
-                          'storedquery_id=fmi::forecast::harmonie::surface::point::simple&' \
-                          'place={place}&parameters=temperature&endtime={endtime}'.format(key=config.FMI_KEY,
-                                                                                          place=config.FMI_LOCATION,
-                                                                                          endtime=endtime)
         result = get_url(
-            url)
+            'https://opendata.fmi.fi/wfs?request=getFeature&'
+            'storedquery_id=fmi::forecast::harmonie::surface::point::simple&'
+            'place={place}&parameters=temperature&endtime={endtime}'.format(
+                place=config.FMI_LOCATION, endtime=endtime))
     except Exception as e:
         logger.exception(e)
     else:
