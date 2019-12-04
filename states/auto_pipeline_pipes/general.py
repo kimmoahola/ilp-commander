@@ -8,12 +8,12 @@ from typing import Optional, Dict
 from pony import orm
 
 import config
-from poller_helpers import Commands, send_ir_signal, write_log_to_sheet, SavedState, logger, decimal_round, Command, \
+from poller_helpers import Commands, send_ir_signal, write_log_to_sheet, SavedState, logger, decimal_round, \
     get_now_isoformat, TempTs, post_url
 from states.controller import Controller
 
 
-def send_command(persistent_data, next_command, extra_info, **kwargs):
+def send_command(persistent_data, next_command, error: Optional[Decimal], extra_info, **kwargs):
     now = time.time()
 
     heating_start_time = persistent_data.get('heating_start_time', now)
@@ -31,15 +31,20 @@ def send_command(persistent_data, next_command, extra_info, **kwargs):
                 next_command != Commands.off or
                 next_command == Commands.off and seconds_since_heating_start > min_time_heating)):
 
-        if (last_command is None or last_command == Commands.off) and next_command != Commands.off:
+        if (last_command is None or last_command == Commands.off) and next_command != Commands.off and (
+            # Stay on off until error > 0
+            error is None or error > 0
+        ):
             # From off to heating
             heating_start_time = now
             send_command_email = True
 
-        elif (last_command is None or last_command != Commands.off) and next_command == Commands.off:
+        elif (last_command is None or last_command != Commands.off) and next_command == Commands.off and (
+            # Stay on heating until error < 0
+            error is None or error < 0
+        ):
             # From heating to off
             send_command_email = True
-
         else:
             send_command_email = False
 
