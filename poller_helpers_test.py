@@ -3,7 +3,6 @@ from decimal import Decimal
 
 from freezegun import freeze_time
 
-import config
 from poller_helpers import median, send_ir_signal, Commands, TempTs
 
 
@@ -73,3 +72,6 @@ def test_command():
     assert not Commands.off > Commands.off
     assert not Commands.off != Commands.off
     assert Commands.off == Commands.off
+    assert Commands.off
+    assert Commands.off != ''
+    assert Commands.off != 234

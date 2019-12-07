@@ -42,7 +42,7 @@ class Command:
         self.temp = temp
 
     def __eq__(self, other):
-        return self.temp == other.temp
+        return isinstance(other, Command) and self.temp == other.temp
 
     def __lt__(self, other):
         if self.temp is None and other.temp is None:
@@ -90,7 +90,7 @@ class Commands:
         if outside_temp is not None and outside_temp < 15:
             list_of_commands.append(Commands.heat24)
 
-        heating_commands = list(filter(lambda c: c.temp > inside_temp + 2, list_of_commands))
+        heating_commands = list(filter(lambda c: c.temp > inside_temp, list_of_commands))
 
         ranges = []
 
