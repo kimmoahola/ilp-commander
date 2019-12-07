@@ -33,7 +33,22 @@ def command_without_inside_temp(outside_temp: Decimal, target_inside_temp: Decim
 
     diff = target_inside_temp - outside_temp
 
-    margin_to_add = diff * Decimal('0.625')
+    if diff < 6:
+        margin_to_add = 0
+    elif diff >= 20:
+        margin_to_add = 15
+    elif diff >= 19:
+        margin_to_add = 14
+    elif diff >= 17:
+        margin_to_add = 12
+    elif diff >= 16:
+        margin_to_add = 10
+    elif diff >= 12:
+        margin_to_add = 3
+    elif diff >= 6:
+        margin_to_add = 2
+    else:
+        margin_to_add = 4
 
     list_of_commands = [
         Commands.heat8,
