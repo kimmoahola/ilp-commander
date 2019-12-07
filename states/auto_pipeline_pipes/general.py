@@ -24,25 +24,21 @@ def send_command(persistent_data, next_command, error: Optional[Decimal], extra_
     if last_command is not None and last_command != Commands.off:
         logger.debug('Heating started %d hours ago', seconds_since_heating_start / 3600.0)
 
-    min_time_heating = 60 * 30
+    min_time_heating = 60 * 45
+    from_off_to_heating = (last_command is None or last_command == Commands.off) and next_command != Commands.off
+    from_heating_to_off = (last_command is None or last_command != Commands.off) and next_command == Commands.off
+    is_min_time_heating_elapsed = seconds_since_heating_start > min_time_heating
 
-    if last_command is None or \
-            (next_command != last_command and (
-                next_command != Commands.off or
-                next_command == Commands.off and seconds_since_heating_start > min_time_heating)):
-
-        if (last_command is None or last_command == Commands.off) and next_command != Commands.off and (
-            # Stay on off until error > 0
-            error is None or error > 0
-        ):
+    if (
+        last_command is None or
+        from_off_to_heating and (error is None or error > 0) or
+        from_heating_to_off and (error is None or error < 0) and is_min_time_heating_elapsed
+    ):
+        if from_off_to_heating:
             # From off to heating
             heating_start_time = now
             send_command_email = True
-
-        elif (last_command is None or last_command != Commands.off) and next_command == Commands.off and (
-            # Stay on heating until error < 0
-            error is None or error < 0
-        ):
+        elif from_heating_to_off:
             # From heating to off
             send_command_email = True
         else:
