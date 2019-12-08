@@ -34,18 +34,9 @@ def send_command(persistent_data, next_command, error: Optional[Decimal], extra_
         from_off_to_heating and (error is None or error > 0) or
         from_heating_to_off and (error is None or error < 0) and is_min_time_heating_elapsed
     ):
-        if from_off_to_heating:
-            # From off to heating
-            heating_start_time = now
-            send_command_email = True
-        elif from_heating_to_off:
-            # From heating to off
-            send_command_email = True
-        else:
-            send_command_email = False
-
-        last_command = next_command
+        send_command_email = from_off_to_heating or from_heating_to_off
         send_ir_signal(next_command, extra_info=extra_info, send_command_email=send_command_email)
+        last_command = next_command
 
     extra_info.append('Actual last command: %s' % last_command)
     logger.info('Actual last command: %s' % last_command)
