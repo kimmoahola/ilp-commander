@@ -62,6 +62,15 @@ def test_send_command_after_first(mocker):
     mock_send.assert_called_with(Commands.heat8)
     assert mock_email.call_count == 1
 
+    assert send_command(
+        persistent_data={'last_command': Commands.heat8},
+        next_command=Commands.heat10,
+        error=Decimal(0),
+        extra_info=[])[1]['last_command'] == Commands.heat10
+
+    mock_send.assert_called_with(Commands.heat10)
+    assert mock_email.call_count == 1
+
     heating_start_time = time.time()
 
     with freeze_time(timedelta(minutes=46)):

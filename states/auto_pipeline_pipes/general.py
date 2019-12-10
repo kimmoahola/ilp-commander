@@ -27,12 +27,14 @@ def send_command(persistent_data, next_command, error: Optional[Decimal], extra_
     min_time_heating = 60 * 45
     from_off_to_heating = (last_command is None or last_command == Commands.off) and next_command != Commands.off
     from_heating_to_off = (last_command is None or last_command != Commands.off) and next_command == Commands.off
+    from_heating_to_heating = (last_command is None or last_command != Commands.off) and next_command != Commands.off
     is_min_time_heating_elapsed = seconds_since_heating_start > min_time_heating
 
     if (
-        last_command is None or
-        from_off_to_heating and (error is None or error > 0) or
-        from_heating_to_off and (error is None or error < 0) and is_min_time_heating_elapsed
+        last_command is None
+        or from_off_to_heating and (error is None or error > 0)
+        or from_heating_to_off and (error is None or error < 0) and is_min_time_heating_elapsed
+        or from_heating_to_heating
     ):
         send_command_email = from_off_to_heating or from_heating_to_off
         send_ir_signal(next_command, extra_info=extra_info, send_command_email=send_command_email)
