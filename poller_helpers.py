@@ -335,7 +335,7 @@ def get_from_smarttings(device_id):
         else:
             item = result.json()["components"]["main"]["temperatureMeasurement"]["temperature"]
             if item["unit"] == "C":
-                temp = Decimal(item["value"])
+                temp = decimal_round(item["value"])
                 ts = arrow.get(item["timestamp"])
     except Exception as e:
         logger.exception(e)
