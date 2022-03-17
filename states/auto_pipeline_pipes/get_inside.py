@@ -4,13 +4,13 @@ from typing import Optional, Tuple
 import arrow
 
 import config
-from poller_helpers import timing, get_from_lambda_url
+from poller_helpers import timing, get_from_smarttings
 from states.auto_pipeline_pipes.helpers import get_temp
 
 
 @timing
 def receive_inside_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arrow]]:
-    return get_from_lambda_url(config.INSIDE_TEMP_ENDPOINT)
+    return get_from_smarttings(config.SMARTTHINGS_DEVICE_ID)
 
 
 def get_inside(add_extra_info, **kwargs):

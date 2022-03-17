@@ -319,9 +319,29 @@ class InitPygsheets:
 
 
 @retry(tries=3, delay=10)
-def get_url(url):
+def get_url(url, headers=None):
     logger.debug(url)
-    return requests.get(url, timeout=60)
+    return requests.get(url, timeout=60, headers=headers)
+
+
+def get_from_smarttings(device_id):
+    temp, ts = None, None
+
+    try:
+        result = get_url("https://api.smartthings.com/v1/devices/%s/status" % device_id,
+            headers={"Authorization": "Bearer %s" % config.SMARTTHINGS_TOKEN})
+        if result.status_code != 200:
+            logger.error('%d: %s' % (result.status_code, result.content))
+        else:
+            item = result.json()["components"]["main"]["temperatureMeasurement"]["temperature"]
+            if item["unit"] == "C":
+                temp = Decimal(item["value"])
+                ts = arrow.get(item["timestamp"])
+    except Exception as e:
+        logger.exception(e)
+
+    logger.info('temp:%s ts:%s', temp, ts)
+    return temp, ts
 
 
 @retry(tries=3, delay=10)

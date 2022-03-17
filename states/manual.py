@@ -6,9 +6,9 @@ from states import State
 class Manual(State):
     def run(self, payload):
         command = None
-        if payload['command'] == 'turn off':
+        if payload.get("command") == 'turn off':
             command = Commands.off
-        elif payload['command'] == 'set temp':
+        elif payload.get("command") == 'set temp':
             command: Command = getattr(Commands, 'heat%d' % int(payload['param']['temp']))
 
         if command:
