@@ -15,7 +15,7 @@ def receive_inside_temperature() -> Tuple[Optional[Decimal], Optional[arrow.Arro
 
 
 def get_inside(add_extra_info, **kwargs):
-    inside_temp = get_temp([receive_inside_temperature])[0]
+    inside_temp = get_temp([receive_inside_temperature], max_ts_diff=120)[0]
     add_extra_info('Inside temperature: %s' % inside_temp)
 
     return {'inside_temp': inside_temp}
