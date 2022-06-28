@@ -1,4 +1,4 @@
-arrow==0.12.1
+arrow==0.15.1
 freezegun==1.2.0
 requests==2.20.1
 pony==0.7.6
