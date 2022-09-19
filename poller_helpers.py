@@ -324,6 +324,7 @@ def get_url(url, headers=None):
     return requests.get(url, timeout=60, headers=headers)
 
 
+@timing
 def get_from_smartthings(device_id):
     temp, ts = None, None
 
